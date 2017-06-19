@@ -1,2 +1,1 @@
-# readAFM
-This is for the code written by the AScI interns Dhananjay and Tobias in the summer 2017.
+So far this only contains the minimal_AFM.py for the first version of the CNN and the readAFMDATAfile.py for the class containing and delivering the data.
