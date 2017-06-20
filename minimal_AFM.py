@@ -82,14 +82,27 @@ if __name__=='__main__':
 
   # Crate saver
   saver = tf.train.Saver()
-
+  
+  # Init op
+  init_op = tf.global_variables_initializer()
 
   # Start session
-  logfile.write('it worked so far, now start interactive session \n')
+  logfile.write('it worked so far, now start session \n')
   sess = tf.InteractiveSession()
-  sess.run(tf.global_variables_initializer())
 
-  logfile.write('Variables initialized successfully \n')
+  sess.run(init_op)
+
+  print("b_conv1, as initialized: ")
+  print(sess.run(b_conv1))
+
+  saver.restore(sess, "/scratch/work/reischt1/calculations/minimal_06_implement_start_from_checkpoint/save/CNN_minimal_TR1.ckpt")
+  logfile.write("Model restored. \n")
+  print("Model restored. See here b_conv1 restored:")
+  print(sess.run(b_conv1))
+  # logfile.write('Variables initialized successfully \n')
+
+
+
 
   # Do stochastic training:
   for i in range(2000):
@@ -102,10 +115,10 @@ if __name__=='__main__':
       if i%100 == 0:
         train_accuracy = accuracy.eval(feed_dict={Fz_xyz:batch[0], solution: batch[1], keep_prob: 1.0})
         logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
-        train_step.run(feed_dict={Fz_xyz: batch[0], solution: batch[1], keep_prob: 0.5})
-        save_path=saver.save(sess, "./CNN_minimal_TR1.ckpt")
+        save_path=saver.save(sess, "/scratch/work/reischt1/calculations/minimal_06_implement_start_from_checkpoint/save/CNN_minimal_TR1.ckpt")
         logfile.write("Model saved in file: %s \n" % save_path)
 
+      train_step.run(feed_dict={Fz_xyz: batch[0], solution: batch[1], keep_prob: 0.5})
       timeend=time.time()
       logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
     except IndexError:
