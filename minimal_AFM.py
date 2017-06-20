@@ -2,8 +2,13 @@ import tensorflow as tf
 import readAFMDATAfile as readAFM
 import numpy as np
 import time
+import argparse
 
-print '04 Imported everything.'
+parser = argparse.ArgumentParser()
+parser.add_argument("name")
+args=parser.parse_args()
+
+print('Parsed name argument {} of type {}.'.format(args.name, type(args.name)))
 
 def weight_variable(shape):
   """ Initializes the variable with random numbers (not 0) """
@@ -25,7 +30,7 @@ def conv3d(x, W):
 
 if __name__=='__main__':
 
-  logfile=open('out_minimal.log', 'w', 0)
+  logfile=open('out_minimal_{}.log'.format(args.name), 'w', 0)
   logfile.write('Start with importing the data \n')
   # AFMdata=readAFM.afmmolecule('dsgdb9nsd_000001.afmdata')
   inputData=np.array((None,81,81,41,1))
@@ -109,13 +114,13 @@ if __name__=='__main__':
     try:
       logfile.write('Starting Run #%i \n'%(i))
       timestart=time.time()
-      batch = readAFM.AFMdata('outputxyz').batch(50)
+      batch = readAFM.AFMdata('/tmp/reischt1/outputxyz').batch(50)
       logfile.write('read batch successfully \n')
 
       if i%100 == 0:
         train_accuracy = accuracy.eval(feed_dict={Fz_xyz:batch[0], solution: batch[1], keep_prob: 1.0})
         logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
-        save_path=saver.save(sess, "/scratch/work/reischt1/calculations/minimal_06_implement_start_from_checkpoint/save/CNN_minimal_TR1.ckpt")
+        save_path=saver.save(sess, "/scratch/work/reischt1/calculations/minimal_06_implement_start_from_checkpoint/save/CNN_minimal_TR1_{}.ckpt".format(args.name))
         logfile.write("Model saved in file: %s \n" % save_path)
 
       train_step.run(feed_dict={Fz_xyz: batch[0], solution: batch[1], keep_prob: 0.5})
@@ -124,7 +129,7 @@ if __name__=='__main__':
     except IndexError:
       print 'Index Error for this File'
   
-  testbatch = readAFM.AFMdata('outputxyz').batch(50)
+  testbatch = readAFM.AFMdata('/tmp/reischt1/outputxyz').batch(50)
   logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch[0], solution: testbatch[1], keep_prob: 1.0}))
 
 
