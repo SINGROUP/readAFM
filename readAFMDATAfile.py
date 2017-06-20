@@ -10,11 +10,11 @@ import numpy as np
 import random
 
 
-parser = argparse.ArgumentParser(description="Take a .AFMDATA file and parse its contents")
-parser.add_argument("-i", "--input_file", default="input.afmdata", help="the path to the input .AFMDATA file (default: %(default)s)")
-args = parser.parse_args()
+# parser = argparse.ArgumentParser(description="Take a .AFMDATA file and parse its contents")
+# parser.add_argument("-i", "--input_file", default="input.afmdata", help="the path to the input .AFMDATA file (default: %(default)s)")
+# args = parser.parse_args()
 
-inputFileName = args.input_file
+# inputFileName = args.input_file
 
 class afmmolecule:
 
@@ -264,7 +264,7 @@ class afmmolecule:
 class AFMdata:
     """ Takes database folder and gives training batches. """
     def __init__(self, FolderName):
-        self.datafiles = glob.glob('./'+FolderName+'/*')
+        self.datafiles = glob.glob(FolderName+'/*')
 
     def batch(self, batchsize):
         batch_Fz=np.zeros((batchsize,81,81,41,1))   # Maybe I can solve this somehow differently by not hardcoding the dimensions?
