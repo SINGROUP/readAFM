@@ -122,7 +122,7 @@ if __name__=='__main__':
       if i%100 == 0:
         train_accuracy = accuracy.eval(feed_dict={Fz_xyz:batch[0], solution: batch[1], keep_prob: 1.0})
         logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
-        save_path=saver.save(sess, "/scratch/work/reischt1/calculations/minimal_06_implement_start_from_checkpoint/save/CNN_minimal_TR1_{}.ckpt".format(args.name))
+        save_path=saver.save(sess, "./save/CNN_minimal_TR1_{}.ckpt".format(args.name))
         logfile.write("Model saved in file: %s \n" % save_path)
 
       train_step.run(feed_dict={Fz_xyz: batch[0], solution: batch[1], keep_prob: 0.5})
@@ -134,6 +134,8 @@ if __name__=='__main__':
   testbatch = readAFM.AFMdata('./outputxyz').batch(50)
   logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch[0], solution: testbatch[1], keep_prob: 1.0}))
   
+
+  # Save two np.arrays to be able to view it later.
   viewfile_prediction=open('view_prediction_{}.npy'.format(args.name), 'w')
   viewfile_solution=open('view_solution_{}.npy'.format(args.name), 'w')
   np.save(viewfile_prediction, y_conv.eval(feed_dict={Fz_xyz: testbatch[0], keep_prob: 1.0}))
