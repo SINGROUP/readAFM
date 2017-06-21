@@ -79,6 +79,8 @@ if __name__=='__main__':
 
   y_conv = tf.nn.relu(tf.add(tf.tensordot(h_fc1_drop, W_fc2, axes=[[3],[0]]), b_fc2))  # Forgot the relu here earlier!
 
+  # We should probalby normalize y_conv somehow?
+
   # set up evaluation system
   cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=solution, logits=y_conv))
   train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
@@ -132,8 +134,8 @@ if __name__=='__main__':
   testbatch = readAFM.AFMdata('./outputxyz').batch(50)
   logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch[0], solution: testbatch[1], keep_prob: 1.0}))
   
-  viewfile_prediction=open('view_prediction_{}.dat'.format(args.name), 'w')
-  viewfile_solution=open('view_solution_{}.dat'.format(args.name), 'w')
+  viewfile_prediction=open('view_prediction_{}.npy'.format(args.name), 'w')
+  viewfile_solution=open('view_solution_{}.npy'.format(args.name), 'w')
   np.save(viewfile_prediction, y_conv.eval(feed_dict={Fz_xyz: testbatch[0], keep_prob: 1.0}))
   np.save(viewfile_solution, testbatch[1])
   viewfile_prediction.close()

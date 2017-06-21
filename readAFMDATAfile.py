@@ -257,6 +257,9 @@ class afmmolecule:
             xPosInt = int(round(xPos/raw[4][0]))       # Attention: The center of the xy grid is the center of mass of the molecule.
             yPosInt = int(round(yPos/raw[4][1]))       # There is some kind of bug here!!! Idk what, but I just catch it. Maybe have a look at it, bc maybe the whole calculation is wrong.
 #            print atomPosition[i,0], COM[0], xPos, xPosInt, yPosInt, atomNameString[i], raw[4][1]
+
+            print(COM[0], COM[1], widthX, widthY, i, xPos, yPos, xPosInt, yPosInt)
+
             projected_array[xPosInt, yPosInt, AtomDict[atomNameString[i]]] = 1
         return projected_array
 
@@ -281,17 +284,5 @@ class AFMdata:
 
 if __name__=='__main__':
     print 'Hallo Main'
-    bla = afmmolecule('dsgdb9nsd_000001.afmdata')
-#    print bla.F_orientation_zxy(3,0,0,0)[0][1]
-#    blarray = bla.fz_array_orientation(3)
-#    print blarray
-#    print bla.solution_xymap_dummy(3)
-#    print bla.F_orientation(3)[0]
-    # print 'Atom name string = ', bla.F_orientation(3)[1]
-    # print 'Atom positions type: ', type(bla.F_orientation(3)[2])
-    # print 'Atom positions shape: ', bla.F_orientation(3)[2].shape
-    # print 'Atom positions: ', bla.F_orientation(3)[2]
-    # x = bla.solution_xymap_projection(3)
-    # print 'solution project all atoms: ', x
-    # print 'np.where(x==1): ', np.where(x==1)
-    trainingbatch=AFMdata('outputxyz').batch(2)
+    datafile = afmmolecule('./outputxyz/dsgdb9nsd_000485.afmdata')
+    datafile.solution_xymap_projection(10)

@@ -4,18 +4,37 @@
 
 
 import numpy as np
+import matplotlib.pyplot as plt
+import glob
 
 
 batchsize = 50                                 # set manually!
 
-view_sol=open('view_solution_*.dat','w')       # set stars manually?
-view_pred=open('view_prediction_*.dat','w')    # set stars manually?
+def compare(solfile='default', predfile='default', atom = 0, batch = 0):
+    """ Compare the solution (in solfile) with the predicted xy-map. Batchindex and atomidex specify what part of the solution should be viewed. """
 
-solution = np.load(view_sol)
-prediction = np.load(view_pred)
+    if solfile == 'default':
+        solfile  = glob.glob('./view_solution_*.npy')[0]
+    if predfile == 'default':
+        predfile = glob.glob('./view_prediction_*.npy')[0]
 
-# This won't work this way, but it should be an inspiration on how to view the atoms
+    view_sol=open(solfile,'w')
+    view_pred=open(predfile,'w')
 
-for i in range(batchsize):
-    for atom in range(5):
-        imshow(prediction(i,:,:,atom)-solution(i,:,:,atom))
+    solution = np.load(view_sol)
+    prediction = np.load(view_pred)
+
+    fig = plt.figure(figsize=(6, 3.2))
+
+    ax = fig.add_subplot(111)
+    ax.set_title('Color map of prediction - solution')
+    plt.imshow(prediction(batch,:,:,atom)-solution(batch,:,:,atom))
+    ax.set_aspect('equal')
+
+    cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
+    cax.get_xaxis().set_visible(False)
+    cax.get_yaxis().set_visible(False)
+    cax.patch.set_alpha(0)
+    cax.set_frame_on(False)
+    plt.colorbar(orientation='vertical')
+    plt.show()
