@@ -132,11 +132,14 @@ if __name__=='__main__':
   testbatch = readAFM.AFMdata('./outputxyz').batch(50)
   logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch[0], solution: testbatch[1], keep_prob: 1.0}))
   
-  viewfile=open('view_{}.dat'.format(args.name), 'w')
-  viewfile.write(str(testbatch[0]))
-  viewfile.write(str(testbatch[1]))
-  viewfile.write(str(y_conv.eval(feed_dict={Fz_xyz: testbatch[0], keep_prob: 1.0})))
-  viewfile.close()
+  viewfile_prediction=open('view_prediction_{}.dat'.format(args.name), 'w')
+  viewfile_solution=open('view_solution_{}.dat'.format(args.name), 'w')
+  np.save(viewfile_prediction, y_conv.eval(feed_dict={Fz_xyz: testbatch[0], keep_prob: 1.0}))
+  np.save(viewfile_solution, testbatch[1])
+  viewfile_prediction.close()
+  viewfile_solution.close()
+  logfile.write('produced viewfiles')
+
   logfile.write('finished! \n')
   logfile.close()
   print 'Finished!'
