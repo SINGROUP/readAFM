@@ -77,12 +77,12 @@ if __name__=='__main__':
   W_fc2 = weight_variable([64,5])
   b_fc2 = bias_variable([81,81,5])
 
-  y_conv = tf.add(tf.tensordot(h_fc1_drop, W_fc2, axes=[[3],[0]]), b_fc2)  # May be wrong? the result of the tensordot and the b_fc1 don't have the same dimensions
+  y_conv = tf.nn.relu(tf.add(tf.tensordot(h_fc1_drop, W_fc2, axes=[[3],[0]]), b_fc2))  # Forgot the relu here earlier!
 
   # set up evaluation system
   cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=solution, logits=y_conv))
   train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-  correct_prediction = tf.equal(tf.argmax(y_conv,2), tf.argmax(solution,2))  # Das stimmt so aber eh nicht!!!
+  correct_prediction = tf.equal(tf.argmax(y_conv,2), tf.argmax(solution,2))  # This might not be a very good function. Think more here.
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
   # Crate saver
@@ -110,11 +110,11 @@ if __name__=='__main__':
 
 
   # Do stochastic training:
-  for i in range(2000):
+  for i in range(1):
     try:
       logfile.write('Starting Run #%i \n'%(i))
       timestart=time.time()
-      batch = readAFM.AFMdata('/tmp/reischt1/outputxyz').batch(50)
+      batch = readAFM.AFMdata('./outputxyz').batch(50)
       logfile.write('read batch successfully \n')
 
       if i%100 == 0:
@@ -129,10 +129,14 @@ if __name__=='__main__':
     except IndexError:
       print 'Index Error for this File'
   
-  testbatch = readAFM.AFMdata('/tmp/reischt1/outputxyz').batch(50)
+  testbatch = readAFM.AFMdata('./outputxyz').batch(50)
   logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch[0], solution: testbatch[1], keep_prob: 1.0}))
-
-
+  
+  viewfile=open('view_{}.dat'.format(args.name), 'w')
+  viewfile.write(str(testbatch[0]))
+  viewfile.write(str(testbatch[1]))
+  viewfile.write(str(y_conv.eval(feed_dict={Fz_xyz: testbatch[0], keep_prob: 1.0})))
+  viewfile.close()
   logfile.write('finished! \n')
   logfile.close()
   print 'Finished!'
