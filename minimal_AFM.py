@@ -82,9 +82,12 @@ if __name__=='__main__':
   # We should probalby normalize y_conv somehow?
 
   # set up evaluation system
-  cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=solution, logits=y_conv))
-  train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-  correct_prediction = tf.equal(tf.argmax(y_conv,2), tf.argmax(solution,2))  # This might not be a very good function. Think more here.
+  classification = tf.reduce_mean(tf.abs(tf.subtract(y_conv, solution)))
+  # cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=solution, logits=y_conv))
+  train_step = tf.train.GradientDescentOptimizer(0.001).minimize(classification)
+  # train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+  # correct_prediction = tf.equal(tf.argmax(y_conv,3), tf.argmax(solution,3))  # This might not be a very good function. Think more here.
+  correct_prediction = tf.abs(tf.subtract(y_conv, solution))
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
   # Crate saver
@@ -125,7 +128,7 @@ if __name__=='__main__':
         save_path=saver.save(sess, "./save/CNN_minimal_TR1_{}.ckpt".format(args.name))
         logfile.write("Model saved in file: %s \n" % save_path)
 
-      train_step.run(feed_dict={Fz_xyz: batch[0], solution: batch[1], keep_prob: 0.5})
+      train_step.run(feed_dict={Fz_xyz: batch[0], solution: batch[1], keep_prob: 0.6})
       timeend=time.time()
       logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
     except IndexError:
