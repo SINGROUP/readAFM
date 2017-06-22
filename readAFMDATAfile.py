@@ -1,6 +1,4 @@
-
-
-# Disclaimer: This was built for python 2.7, it does not work with python3 !!!
+#Disclaimer: This was built for python 2.7, it does not work with python3 !!!
 
 
 import struct
@@ -8,7 +6,7 @@ import glob
 import argparse
 import numpy as np
 import random
-
+from scipy.stats import multivariate_normal
 
 # parser = argparse.ArgumentParser(description="Take a .AFMDATA file and parse its contents")
 # parser.add_argument("-i", "--input_file", default="input.afmdata", help="the path to the input .AFMDATA file (default: %(default)s)")
@@ -234,9 +232,10 @@ class afmmolecule:
         atomNameString=raw[1]
         atomPosition=raw[2]
         AtomDict = {'C': 0, 'H': 1, 'O': 2, 'N': 3, 'F': 4}
-        
-        projected_array = np.zeros((raw[5][0],raw[5][1],5))   # x, y, AtomNumber as in the dict
+        #print raw
+        projected_array = np.zeros((raw[5][0], raw[5][1], 5))   # x, y, AtomNumber as in the dict
         masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 'F' : 18.9984}
+        covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}
         # Calculate Center Of Mass:
         COM = np.zeros((3))
         totalMass=0.0
@@ -251,16 +250,58 @@ class afmmolecule:
 
         widthX=raw[3][0]
         widthY=raw[3][1]
+        
+        max_Zposition = 0.0
+        indexOf_max_Zposition = 0
+
+        for i in range(len(atomNameString)):
+            if atomPosition[i, 2] > max_Zposition:
+                max_Zposition = atomPosition[i, 2]
+                indexOf_max_Zposition_in_atomNameString = i
+
+        matrixPositionZIndex = int(round((atomPosition[indexOf_max_Zposition_in_atomNameString,2]-COM[2]+10)/raw[4][2]))
+
         for i in range(len(atomNameString)):
             xPos = atomPosition[i,0]-COM[0]+(widthX/2.)
             yPos = atomPosition[i,1]-COM[1]+(widthY/2.)
+            zPos = atomPosition[i,2]-COM[2]+10         # Here 10 is just an arbitrary number used to define a new Z grid such that all the values of zPos are positive. The new centre of mass will be at (widthX/2, widthY/2, 10). The projected area matrix will be evaluated at a height of index number 140 as the mechafm tip is 4 angstroms above the COM of the molecule and 10*10+4*10 is 140. This is to ensure that this grid is above the topmost atom, as the AFM results are read from above 
             xPosInt = int(round(xPos/raw[4][0]))       # Attention: The center of the xy grid is the center of mass of the molecule.
             yPosInt = int(round(yPos/raw[4][1]))       # There is some kind of bug here!!! Idk what, but I just catch it. Maybe have a look at it, bc maybe the whole calculation is wrong.
-#            print atomPosition[i,0], COM[0], xPos, xPosInt, yPosInt, atomNameString[i], raw[4][1]
+            zPosInt = int(round(zPos/raw[4][2]))
+#           print atomPosition[i,0], COM[0], xPos, xPosInt, yPosInt, atomNameString[i], raw[4][1]
+            
+            selectedAtomGridIndex = AtomDict[atomNameString[i]]
 
-            print(COM[0], COM[1], widthX, widthY, i, xPos, yPos, xPosInt, yPosInt)
+            variance = 1.0*(covalentRadii[atomNameString[i]])/76          #76 is the cov radius of carbon, 1 is an arbitrary value for the variance to allow enough spreading
+            #print variance
+            covarianceMatrix = [[variance,0,0],[0,variance,0],[0,0,variance]]
+            gaussianDistribution = multivariate_normal(mean=[xPosInt, yPosInt, zPosInt], cov=covarianceMatrix)
+            #find gaussianDistribution.pdf() at each point on the XY matrix at height 140 and add to the matrix of that type of atom
+            for yIndexIter in range(raw[5][1]):
+                for xIndexIter in range(raw[5][0]):
+                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += gaussianDistribution.pdf([xIndexIter, yIndexIter, matrixPositionZIndex])
 
-            projected_array[xPosInt, yPosInt, AtomDict[atomNameString[i]]] = 1
+            
+            #print(COM[0], COM[1], widthX, widthY, i, xPos, yPos, xPosInt, yPosInt, zPosInt)
+            #projected_array[xPosInt, yPosInt, AtomDict[atomNameString[i]]] = 1
+        
+        #print projected_array[9, 41, 3]
+        #print projected_array[10, 41, 3]
+        #print projected_array[72, 39, 0]
+
+        #maxValues = np.zeros(5)
+        #for i in range(5):
+        #    maxValues[i] = np.amax(projected_array[:, :, i])
+        #    projected_array[:, :, i] = np.divide(projected_array[:, :, i], maxValues[i])
+        
+        projected_array = projected_array * 10
+
+        #print projected_array[9, 41, 3] 
+        #print projected_array[10, 41, 3]
+        #print projected_array[72, 39, 0]
+        #print projected_array[21, 41, 0]
+        #print projected_array
+        
         return projected_array
 
 
@@ -284,5 +325,5 @@ class AFMdata:
 
 if __name__=='__main__':
     print 'Hallo Main'
-    datafile = afmmolecule('./outputxyz/dsgdb9nsd_000485.afmdata')
+    datafile = afmmolecule('../../outputxyz/dsgdb9nsd_000485.afmdata')
     datafile.solution_xymap_projection(10)
