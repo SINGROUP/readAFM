@@ -84,7 +84,7 @@ if __name__=='__main__':
   # set up evaluation system
   classification = tf.reduce_mean(tf.abs(tf.subtract(y_conv, solution)))
   # cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=solution, logits=y_conv))
-  train_step = tf.train.GradientDescentOptimizer(0.001).minimize(classification)
+  train_step = tf.train.AdamOptimizer(0.001).minimize(classification)
   # train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
   # correct_prediction = tf.equal(tf.argmax(y_conv,3), tf.argmax(solution,3))  # This might not be a very good function. Think more here.
   correct_prediction = tf.abs(tf.subtract(y_conv, solution))
@@ -105,10 +105,10 @@ if __name__=='__main__':
   print("b_conv1, as initialized: ")
   print(sess.run(b_conv1))
 
-  saver.restore(sess, "/scratch/work/reischt1/calculations/minimal_06_implement_start_from_checkpoint/save/CNN_minimal_TR1.ckpt")
-  logfile.write("Model restored. \n")
-  print("Model restored. See here b_conv1 restored:")
-  print(sess.run(b_conv1))
+  # saver.restore(sess, "/scratch/work/reischt1/calculations/minimal_06_implement_start_from_checkpoint/save/CNN_minimal_TR1.ckpt")
+  # logfile.write("Model restored. \n")
+  # print("Model restored. See here b_conv1 restored:")
+  # print(sess.run(b_conv1))
   # logfile.write('Variables initialized successfully \n')
 
 

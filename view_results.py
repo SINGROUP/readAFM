@@ -18,8 +18,10 @@ def compare(solfile='default', predfile='default', atom = 0, batch = 0):
     if predfile == 'default':
         predfile = glob.glob('./view_prediction_*.npy')[0]
 
-    view_sol=open(solfile,'w')
-    view_pred=open(predfile,'w')
+    print('Opening solution from: %s' % solfile)
+    view_sol=open(solfile,'r')
+    print('Opening solution from: %s ' % predfile)
+    view_pred=open(predfile,'r')
 
     solution = np.load(view_sol)
     prediction = np.load(view_pred)
@@ -28,7 +30,30 @@ def compare(solfile='default', predfile='default', atom = 0, batch = 0):
 
     ax = fig.add_subplot(111)
     ax.set_title('Color map of prediction - solution')
-    plt.imshow(prediction(batch,:,:,atom)-solution(batch,:,:,atom))
+    plt.imshow(prediction[batch,:,:,atom]-solution[batch,:,:,atom])
+    ax.set_aspect('equal')
+
+    cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
+    cax.get_xaxis().set_visible(False)
+    cax.get_yaxis().set_visible(False)
+    cax.patch.set_alpha(0)
+    cax.set_frame_on(False)
+    plt.colorbar(orientation='vertical')
+    plt.show()
+
+def view(infile, atom = 0, batch = 0):
+    """ View a map given in 'infile'. Batchindex and atomidex specify what part of the solution should be viewed. """
+
+    print('Opening solution from: %s' % infile)
+    view_in=open(infile,'r')
+
+    viewmap = np.load(view_in)
+
+    fig = plt.figure(figsize=(6, 3.2))
+
+    ax = fig.add_subplot(111)
+    ax.set_title('Color map of {}'.format(infile))
+    plt.imshow(viewmap[batch,:,:,atom])
     ax.set_aspect('equal')
 
     cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
