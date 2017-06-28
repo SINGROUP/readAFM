@@ -243,7 +243,7 @@ class afmmolecule:
         widthY=raw[3][1]
         
         max_Zposition = 0.0
-        indexOf_max_Zposition = 0
+        indexOf_max_Zposition_in_atomNameString = 0
 
         for i in range(len(atomNameString)):
             if atomPosition[i, 2] > max_Zposition:
