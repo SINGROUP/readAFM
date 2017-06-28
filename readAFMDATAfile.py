@@ -27,7 +27,9 @@ class afmmolecule:
         self.afmdataFile.seek(0)
 
     def F_orientation_zxy(self, orientationNumber, zIndex, xIndex, yIndex):
-        """orientationNumber = 1      modify to get desired orientation index. Starts from 0
+        """ Returns Fz for a given tip position.
+        
+        orientationNumber = 1      modify to get desired orientation index. Starts from 0
         zIndex = 23         modify to get desired z index. Starts from 0 
         xIndex = 12         modify to get desired x index. Starts from 0 
         yIndex = 3          modify to get desired y index. Starts from 0  """
@@ -116,7 +118,7 @@ class afmmolecule:
 
 
     def F_orientation(self, orientationNumber=1):
-        """ Gives data back for the specified orientation of the molecule.  """
+        """ Gives complete Fz-array for the specified orientation of the molecule.  """
 
         fz=0.0   #fz will be stored here
         atomNameString = ""         #All the atoms in this molecule will be stored here. For example "CHHHH"
@@ -207,19 +209,8 @@ class afmmolecule:
         return [fzarray, atomNameString, atomPosition, [widthX,widthY,widthZ],[dx,dy,dz],[divX,divY,divZ]]
 
 
-
-    def solution_xymap_dummy(self,orientation):
-        """Dummy solution to train. xy-map with one hot vecors correspoding to the position of the atoms."""
-        solution=np.zeros((41,40,5))
-        solution[20,20,0]=1
-        solution[30,34,0]=1
-        solution[10,10,1]=1
-        solution[20,25,2]=1
-        return solution
-
-
     def solution_xymap_projection(self, orientationNumber):
-        """Returns solution to train. Here xy-map with one hot vecors correspoding to the position of the atoms. Project the atom positions on the xy-plane and write it on the correct level of the np-array.
+        """Returns solution to train. Project the atom positions on the xy-plane with Amplitudes decaying like a Gaussian with the radius as variance. and write it on the correct level of the np-array.
         The last index of the array corresponds to the atom type:
         0 = C
         1 = H
