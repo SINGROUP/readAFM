@@ -1,5 +1,6 @@
 import tensorflow as tf
-import readAFMDATAfile as readAFM
+# import readAFMDATAfile as readAFM
+import readAFMHDF5 as readAFM
 import numpy as np
 import time
 import argparse
@@ -119,7 +120,7 @@ if __name__=='__main__':
     try:
       logfile.write('Starting Run #%i \n'%(i))
       timestart=time.time()
-      batch = readAFM.AFMdata('./outputxyz').batch(50)
+      batch = readAFM.AFMdata('./AFMDB_version_01.hdf5').batch(50)
       logfile.write('read batch successfully \n')
 
       if i%100 == 0:
@@ -134,7 +135,7 @@ if __name__=='__main__':
     except IndexError:
       print 'Index Error for this File'
   
-  testbatch = readAFM.AFMdata('./outputxyz').batch(50)
+  testbatch = readAFM.AFMdata('./AFMDB_version_01.hdf5').batch(50)
   logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch[0], solution: testbatch[1], keep_prob: 1.0}))
   
 
