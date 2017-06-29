@@ -8,12 +8,12 @@ module load anaconda2
 module load CUDA
 source activate /scratch/work/reischt1/tf-gpu
 
-mkdir -p /tmp/reischt1/outputxyz
-time cp -r ./outputxyz/* /tmp/reischt1/outputxyz/ #takes approx 13min but saves 5s/trainstep --> favourable for >160 steps!
+mkdir -p /tmp/reischt1/
+time cp ./AFMDB_version_01.hdf5 /tmp/reischt1/
 echo "Copied files, here a ls: "
-ls /tmp/reischt1/outputxyz
+ls /tmp/reischt1/
 echo "Starting minimal_AFM: "
 srun python minimal_AFM.py $SLURM_JOB_ID
-time rm -r /tmp/reischt1/
+# time rm -r /tmp/reischt1/
 
 source deactivate
