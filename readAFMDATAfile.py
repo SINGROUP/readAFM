@@ -3,16 +3,10 @@
 
 import struct
 import glob
-import argparse
 import numpy as np
 import random
-from scipy.stats import multivariate_normal
+from math import sqrt, exp, pi
 
-# parser = argparse.ArgumentParser(description="Take a .AFMDATA file and parse its contents")
-# parser.add_argument("-i", "--input_file", default="input.afmdata", help="the path to the input .AFMDATA file (default: %(default)s)")
-# args = parser.parse_args()
-
-# inputFileName = args.input_file
 
 class afmmolecule:
 
@@ -205,8 +199,13 @@ class afmmolecule:
 
         # rewind filestream:
         self.afmdataFile.seek(0)
-
-        return [fzarray, atomNameString, atomPosition, [widthX,widthY,widthZ],[dx,dy,dz],[divX,divY,divZ]]
+        return {'fzarray': fzarray, 
+                'atomNameString': atomNameString, 
+                'atomPosition': atomPosition, 
+                'widths': [widthX, widthY, widthZ], 
+                'stepwidths': [dx,dy,dz],
+                'divs': [divX,divY,divZ]}
+#         return [fzarray, atomNameString, atomPosition, [widthX,widthY,widthZ],[dx,dy,dz],[divX,divY,divZ]]
 
 
     def solution_xymap_projection(self, orientationNumber):
@@ -219,12 +218,12 @@ class afmmolecule:
         4 = F
     
         """
-        raw=self.F_orientation(orientationNumber)
-        atomNameString=raw[1]
-        atomPosition=raw[2]
+        rawdata=self.F_orientation(orientationNumber)
+        atomNameString=rawdata['atomNameString']
+        atomPosition=rawdata['atomPosition']
         AtomDict = {'C': 0, 'H': 1, 'O': 2, 'N': 3, 'F': 4}
         #print raw
-        projected_array = np.zeros((raw[5][0], raw[5][1], 5))   # x, y, AtomNumber as in the dict
+        projected_array = np.zeros((rawdata['divs'][0], rawdata['divs'][1], 5))   # x, y, AtomNumber as in the dict
         masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 'F' : 18.9984}
         covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}
         # Calculate Center Of Mass:
@@ -232,15 +231,12 @@ class afmmolecule:
         totalMass=0.0
         for i in range(len(atomNameString)):
             atomVector = atomPosition[i,:]
-            # xPos = atomPosition[i,0]
-            # yPos = atomPosition[i,1]
-            # zPos = atomPosition[i,2]
             COM += atomVector*masses[atomNameString[i]]
             totalMass+=masses[atomNameString[i]]
         COM = COM/totalMass
 
-        widthX=raw[3][0]
-        widthY=raw[3][1]
+        widthX=rawdata['widths'][0]
+        widthY=rawdata['widths'][1]
         
         max_Zposition = 0.0
         indexOf_max_Zposition_in_atomNameString = 0
@@ -250,27 +246,37 @@ class afmmolecule:
                 max_Zposition = atomPosition[i, 2]
                 indexOf_max_Zposition_in_atomNameString = i
 
-        matrixPositionZIndex = int(round((atomPosition[indexOf_max_Zposition_in_atomNameString,2]-COM[2]+10)/raw[4][2]))
+        matrixPositionZIndex = int(round((atomPosition[indexOf_max_Zposition_in_atomNameString,2]-COM[2]+10)/rawdata['stepwidths'][2]))
+
+        def atomSignal(evalvect, meanvect, atomNameString):
+            """ This is not a Normal Distribution!!! It's a gauss-like distribution, but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), this is s.t. the different elements give different 'signals'. """
+            # Lets try it without Normalisation
+#             return 1/sqrt(2*pi*sigma**2)*exp(-((x-xmen)**2+(y-ymean)**2+(z-zmean)**2)/sigma**2)
+            sigma = 5.0*(covalentRadii[atomNameString[i]])/76
+            normalisation = 1.0*(covalentRadii[atomNameString[i]])/76.
+#             normalisation = 1.0
+            return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
 
         for i in range(len(atomNameString)):
             xPos = atomPosition[i,0]-COM[0]+(widthX/2.)
             yPos = atomPosition[i,1]-COM[1]+(widthY/2.)
             zPos = atomPosition[i,2]-COM[2]+10         # Here 10 is just an arbitrary number used to define a new Z grid such that all the values of zPos are positive. The new centre of mass will be at (widthX/2, widthY/2, 10). The projected area matrix will be evaluated at a height of index number 140 as the mechafm tip is 4 angstroms above the COM of the molecule and 10*10+4*10 is 140. This is to ensure that this grid is above the topmost atom, as the AFM results are read from above 
-            xPosInt = int(round(xPos/raw[4][0]))       # Attention: The center of the xy grid is the center of mass of the molecule.
-            yPosInt = int(round(yPos/raw[4][1]))       # There is some kind of bug here!!! Idk what, but I just catch it. Maybe have a look at it, bc maybe the whole calculation is wrong.
-            zPosInt = int(round(zPos/raw[4][2]))
+            xPosInt = int(round(xPos/rawdata['stepwidths'][0]))       # Attention: The center of the xy grid is the center of mass of the molecule.
+            yPosInt = int(round(yPos/rawdata['stepwidths'][1]))       # There is some kind of bug here!!! Idk what, but I just catch it. Maybe have a look at it, bc maybe the whole calculation is wrong.
+            zPosInt = int(round(zPos/rawdata['stepwidths'][2]))
 #           print atomPosition[i,0], COM[0], xPos, xPosInt, yPosInt, atomNameString[i], raw[4][1]
             
             selectedAtomGridIndex = AtomDict[atomNameString[i]]
 
-            variance = 1.0*(covalentRadii[atomNameString[i]])/76          #76 is the cov radius of carbon, 1 is an arbitrary value for the variance to allow enough spreading
+            #76 is the cov radius of carbon, 1 is an arbitrary value for the variance to allow enough spreading
             #print variance
-            covarianceMatrix = [[variance,0,0],[0,variance,0],[0,0,variance]]
-            gaussianDistribution = multivariate_normal(mean=[xPosInt, yPosInt, zPosInt], cov=covarianceMatrix)
+#             covarianceMatrix = [[variance,0,0],[0,variance,0],[0,0,variance]]
+#             gaussianDistribution = multivariate_normal(mean=[xPosInt, yPosInt, zPosInt], cov=covarianceMatrix)
+            
             #find gaussianDistribution.pdf() at each point on the XY matrix at height 140 and add to the matrix of that type of atom
-            for yIndexIter in range(raw[5][1]):
-                for xIndexIter in range(raw[5][0]):
-                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += gaussianDistribution.pdf([xIndexIter, yIndexIter, matrixPositionZIndex])
+            for yIndexIter in range(rawdata['divs'][1]):
+                for xIndexIter in range(rawdata['divs'][0]):
+                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += atomSignal([xIndexIter, yIndexIter, matrixPositionZIndex], [xPosInt, yPosInt, zPosInt], atomNameString)
 
             
             #print(COM[0], COM[1], widthX, widthY, i, xPos, yPos, xPosInt, yPosInt, zPosInt)
@@ -286,16 +292,189 @@ class afmmolecule:
         #    projected_array[:, :, i] = np.divide(projected_array[:, :, i], maxValues[i])
         
         projected_array = projected_array * 10
+        
+        return projected_array
+    
+    def solution_xymap_withoutH(self, orientationNumber):
+        """ Manipulating hydrogens atom radius s.t. it is a lot smaller than all other atoms. """
+        rawdata=self.F_orientation(orientationNumber)
+        atomNameString=rawdata['atomNameString']
+        atomPosition=rawdata['atomPosition']
+        AtomDict = {'C': 0, 'H': 1, 'O': 2, 'N': 3, 'F': 4}
+        #print raw
+        projected_array = np.zeros((rawdata['divs'][0], rawdata['divs'][1], 5))   # x, y, AtomNumber as in the dict
+        masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 'F' : 18.9984}
+        covalentRadii = {'H' : 0.1, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  # Use 10 instead of 31 for H
+        # Calculate Center Of Mass:
+        COM = np.zeros((3))
+        totalMass=0.0
+        for i in range(len(atomNameString)):
+            atomVector = atomPosition[i,:]
+            COM += atomVector*masses[atomNameString[i]]
+            totalMass+=masses[atomNameString[i]]
+        COM = COM/totalMass
 
-        #print projected_array[9, 41, 3] 
+        widthX=rawdata['widths'][0]
+        widthY=rawdata['widths'][1]
+        
+        max_Zposition = 0.0
+        indexOf_max_Zposition_in_atomNameString = 0
+
+        for i in range(len(atomNameString)):
+            if atomPosition[i, 2] > max_Zposition:
+                max_Zposition = atomPosition[i, 2]
+                indexOf_max_Zposition_in_atomNameString = i
+
+        matrixPositionZIndex = int(round((atomPosition[indexOf_max_Zposition_in_atomNameString,2]-COM[2]+10)/rawdata['stepwidths'][2]))
+
+        def atomSignal(evalvect, meanvect, atomNameString):
+            """ This is not a Normal Distribution!!! It's a gauss-like distribution, but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), this is s.t. the different elements give different 'signals'. """
+            # Lets try it without Normalisation
+#             return 1/sqrt(2*pi*sigma**2)*exp(-((x-xmen)**2+(y-ymean)**2+(z-zmean)**2)/sigma**2)
+            sigma = 5.0*(covalentRadii[atomNameString[i]])/76
+            normalisation = 1.0*(covalentRadii[atomNameString[i]])/76.
+#             normalisation = 1.0
+            return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
+
+        for i in range(len(atomNameString)):
+            xPos = atomPosition[i,0]-COM[0]+(widthX/2.)
+            yPos = atomPosition[i,1]-COM[1]+(widthY/2.)
+            zPos = atomPosition[i,2]-COM[2]+10         # Here 10 is just an arbitrary number used to define a new Z grid such that all the values of zPos are positive. The new centre of mass will be at (widthX/2, widthY/2, 10). The projected area matrix will be evaluated at a height of index number 140 as the mechafm tip is 4 angstroms above the COM of the molecule and 10*10+4*10 is 140. This is to ensure that this grid is above the topmost atom, as the AFM results are read from above 
+            xPosInt = int(round(xPos/rawdata['stepwidths'][0]))       # Attention: The center of the xy grid is the center of mass of the molecule.
+            yPosInt = int(round(yPos/rawdata['stepwidths'][1]))       # There is some kind of bug here!!! Idk what, but I just catch it. Maybe have a look at it, bc maybe the whole calculation is wrong.
+            zPosInt = int(round(zPos/rawdata['stepwidths'][2]))
+#           print atomPosition[i,0], COM[0], xPos, xPosInt, yPosInt, atomNameString[i], raw[4][1]
+            
+            selectedAtomGridIndex = AtomDict[atomNameString[i]]
+
+            #76 is the cov radius of carbon, 1 is an arbitrary value for the variance to allow enough spreading
+            #print variance
+#             covarianceMatrix = [[variance,0,0],[0,variance,0],[0,0,variance]]
+#             gaussianDistribution = multivariate_normal(mean=[xPosInt, yPosInt, zPosInt], cov=covarianceMatrix)
+            
+            #find gaussianDistribution.pdf() at each point on the XY matrix at height 140 and add to the matrix of that type of atom
+            for yIndexIter in range(rawdata['divs'][1]):
+                for xIndexIter in range(rawdata['divs'][0]):
+                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += atomSignal([xIndexIter, yIndexIter, matrixPositionZIndex], [xPosInt, yPosInt, zPosInt], atomNameString)
+
+            
+            #print(COM[0], COM[1], widthX, widthY, i, xPos, yPos, xPosInt, yPosInt, zPosInt)
+            #projected_array[xPosInt, yPosInt, AtomDict[atomNameString[i]]] = 1
+        
+        #print projected_array[9, 41, 3]
         #print projected_array[10, 41, 3]
         #print projected_array[72, 39, 0]
-        #print projected_array[21, 41, 0]
-        #print projected_array
+
+        #maxValues = np.zeros(5)
+        #for i in range(5):
+        #    maxValues[i] = np.amax(projected_array[:, :, i])
+        #    projected_array[:, :, i] = np.divide(projected_array[:, :, i], maxValues[i])
+        
+        projected_array = projected_array * 10
         
         return projected_array
 
+    def solution_xymap_naive_projection(self, orientationNumber):
+        """Returns solution to train. Project the atom positions on the xy-plane with Amplitudes decaying like a Gaussian with the radius as variance. and write it on the correct level of the np-array.
+        The last index of the array corresponds to the atom type:
+        0 = C
+        1 = H
+        2 = 0
+        3 = N
+        4 = F
+    
+        This is not written very transparently. It is just solution_xymap_projection but the gaussians are not decaying in z-Direction.
+    
+        """
+        rawdata=self.F_orientation(orientationNumber)
+        atomNameString=rawdata['atomNameString']
+        atomPosition=rawdata['atomPosition']
+        AtomDict = {'C': 0, 'H': 1, 'O': 2, 'N': 3, 'F': 4}
+        #print raw
+        projected_array = np.zeros((rawdata['divs'][0], rawdata['divs'][1], 5))   # x, y, AtomNumber as in the dict
+        masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 'F' : 18.9984}
+        covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}
+        # Calculate Center Of Mass:
+        COM = np.zeros((3))
+        totalMass=0.0
+        for i in range(len(atomNameString)):
+            atomVector = atomPosition[i,:]
+            COM += atomVector*masses[atomNameString[i]]
+            totalMass+=masses[atomNameString[i]]
+        COM = COM/totalMass
 
+        widthX=rawdata['widths'][0]
+        widthY=rawdata['widths'][1]
+        
+        max_Zposition = 0.0
+        indexOf_max_Zposition_in_atomNameString = 0
+
+        for i in range(len(atomNameString)):
+            if atomPosition[i, 2] > max_Zposition:
+                max_Zposition = atomPosition[i, 2]
+                indexOf_max_Zposition_in_atomNameString = i
+
+        matrixPositionZIndex = int(round((atomPosition[indexOf_max_Zposition_in_atomNameString,2]-COM[2]+10)/rawdata['stepwidths'][2]))
+
+        def atomSignal(evalvect, meanvect, atomNameString):
+            """ This is not a Normal Distribution!!! It's a gauss-like distribution, but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), this is s.t. the different elements give different 'signals'. """
+            # Lets try it without Normalisation
+#             return 1/sqrt(2*pi*sigma**2)*exp(-((x-xmen)**2+(y-ymean)**2+(z-zmean)**2)/sigma**2)
+            sigma = 5.0*(covalentRadii[atomNameString[i]])/76
+            normalisation = 1.0*(covalentRadii[atomNameString[i]])/76.
+#             normalisation = 1.0
+            return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2)/sigma**2)
+
+        for i in range(len(atomNameString)):
+            xPos = atomPosition[i,0]-COM[0]+(widthX/2.)
+            yPos = atomPosition[i,1]-COM[1]+(widthY/2.)
+            zPos = atomPosition[i,2]-COM[2]+10         # Here 10 is just an arbitrary number used to define a new Z grid such that all the values of zPos are positive. The new centre of mass will be at (widthX/2, widthY/2, 10). The projected area matrix will be evaluated at a height of index number 140 as the mechafm tip is 4 angstroms above the COM of the molecule and 10*10+4*10 is 140. This is to ensure that this grid is above the topmost atom, as the AFM results are read from above 
+            xPosInt = int(round(xPos/rawdata['stepwidths'][0]))       # Attention: The center of the xy grid is the center of mass of the molecule.
+            yPosInt = int(round(yPos/rawdata['stepwidths'][1]))       # There is some kind of bug here!!! Idk what, but I just catch it. Maybe have a look at it, bc maybe the whole calculation is wrong.
+            zPosInt = int(round(zPos/rawdata['stepwidths'][2]))
+#           print atomPosition[i,0], COM[0], xPos, xPosInt, yPosInt, atomNameString[i], raw[4][1]
+            
+            selectedAtomGridIndex = AtomDict[atomNameString[i]]
+
+            #76 is the cov radius of carbon, 1 is an arbitrary value for the variance to allow enough spreading
+            #print variance
+#             covarianceMatrix = [[variance,0,0],[0,variance,0],[0,0,variance]]
+#             gaussianDistribution = multivariate_normal(mean=[xPosInt, yPosInt, zPosInt], cov=covarianceMatrix)
+            
+            #find gaussianDistribution.pdf() at each point on the XY matrix at height 140 and add to the matrix of that type of atom
+            for yIndexIter in range(rawdata['divs'][1]):
+                for xIndexIter in range(rawdata['divs'][0]):
+                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += atomSignal([xIndexIter, yIndexIter, matrixPositionZIndex], [xPosInt, yPosInt, zPosInt], atomNameString)
+
+            
+            #print(COM[0], COM[1], widthX, widthY, i, xPos, yPos, xPosInt, yPosInt, zPosInt)
+            #projected_array[xPosInt, yPosInt, AtomDict[atomNameString[i]]] = 1
+        
+        #print projected_array[9, 41, 3]
+        #print projected_array[10, 41, 3]
+        #print projected_array[72, 39, 0]
+
+        #maxValues = np.zeros(5)
+        #for i in range(5):
+        #    maxValues[i] = np.amax(projected_array[:, :, i])
+        #    projected_array[:, :, i] = np.divide(projected_array[:, :, i], maxValues[i])
+        
+        projected_array = projected_array * 10
+        
+        return projected_array
+
+    
+    def solution_xymap_collapsed(self, orientationNumber):
+        """Gives a version of the xymap solution collapsed to only one map, asking the question 'atom or not?' instead of 'What kind of atom?' """
+        collapsed_array = np.sum(self.solution_xymap_projection(orientationNumber),axis=-1, keepdims=True)
+#         collapsed_array.shape = (81,81,1)
+        return collapsed_array
+    
+    def solution_xymap_naive_collapsed(self, orientationNumber):
+        """ Collapses the naive solution to only one map. """
+        return np.sum(self.solution_xymap_naive_projection(orientationNumber), axis = -1, keepdims = True)
+            
+            
 class AFMdata:
     """ Takes database folder and gives training batches. """
     def __init__(self, FolderName):
@@ -308,13 +487,43 @@ class AFMdata:
             randommolecule=afmmolecule(random.choice(self.datafiles))  # Choose a random molecule
             orientation=random.randint(0,randommolecule.totalNumOrientations-1)   # Choose a random Orientation
             print 'Looking at file ', randommolecule.inputFileName, ' at orientation ', orientation
-            batch_Fz[i]=randommolecule.F_orientation(orientation)[0]
+            batch_Fz[i]=randommolecule.F_orientation(orientation)['fzarray']
             batch_solutions[i]=randommolecule.solution_xymap_projection(orientation)
-        return [batch_Fz, batch_solutions]
+        return {'forces': batch_Fz, 'solutions': batch_solutions}
 
 
 
 if __name__=='__main__':
     print 'Hallo Main'
-    datafile = afmmolecule('../../outputxyz/dsgdb9nsd_000485.afmdata')
-    datafile.solution_xymap_projection(10)
+    datafile = afmmolecule('./outputxyz/dsgdb9nsd_000485.afmdata')
+    f = open('./testsolution.npy', 'w')
+    g = open('./testsolutioncollapsed.npy', 'w')
+    h = open('./testsolutionwoH.npy', 'w')
+    j = open('./correspondingfz.npy', 'w')
+    k = open('./testsolutionnaive.npy', 'w')   
+    l = open('./testsolutionnaivecollapsed.npy','w')
+    testsols = np.zeros((10,81,81,5))
+    collsols = np.zeros((10,81,81,1))
+    wohsols =  np.zeros((10,81,81,5))
+    fz = np.zeros((10,81,81,41))
+    naivesols = np.zeros((10,81,81,5))
+    naivecoll = np.zeros((10,81,81,1))
+    for i in range(10):
+        testsols[i,:,:,:] = datafile.solution_xymap_projection(i+17)
+        collsols[i,:,:,:] = datafile.solution_xymap_collapsed(i+17)
+        wohsols[i,:,:,:] = datafile.solution_xymap_withoutH(i+17)
+        fz[i,:,:,:] = datafile.F_orientation(i+17)['fzarray'][:,:,:,0]
+        naivesols[i,:,:,:] = datafile.solution_xymap_naive_projection(i+17)
+        naivecoll[i,:,:,:] = datafile.solution_xymap_naive_collapsed(i+17)
+    np.save(f,testsols)
+    np.save(g,collsols)
+    np.save(h,wohsols)
+    np.save(j,fz)
+    np.save(k, naivesols)
+    np.save(l, naivecoll)
+    f.close()
+    g.close()
+    h.close()
+    j.close()
+    k.close()
+    l.close()

@@ -130,21 +130,21 @@ if __name__=='__main__':
                 save_path=saver.save(sess, "./save/CNN_minimal_TR1_{}.ckpt".format(args.name))
                 logfile.write("Model saved in file: %s \n" % save_path)
     
-                train_step.run(feed_dict={Fz_xyz: batch[0], solution: batch[1], keep_prob: 0.6})
+                train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
                 timeend=time.time()
                 logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
         except IndexError:
             print 'Index Error for this File'
     
     testbatch = AFMdata.batch(50)
-    logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch[0], solution: testbatch[1], keep_prob: 1.0}))
+    logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0}))
     
     
     # Save two np.arrays to be able to view it later.
     viewfile_prediction=open('view_prediction_{}.npy'.format(args.name), 'w')
     viewfile_solution=open('view_solution_{}.npy'.format(args.name), 'w')
-    np.save(viewfile_prediction, y_conv.eval(feed_dict={Fz_xyz: testbatch[0], keep_prob: 1.0}))
-    np.save(viewfile_solution, testbatch[1])
+    np.save(viewfile_prediction, y_conv.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}))
+    np.save(viewfile_solution, testbatch['solutions'])
     viewfile_prediction.close()
     viewfile_solution.close()
     logfile.write('produced viewfiles')

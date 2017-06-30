@@ -18,7 +18,7 @@ class AFMdata:
 
             batch_Fz[i]=randomorientation['fzvals'][...]
             batch_solutions[i]=randomorientation['solution'][...]
-        return [batch_Fz, batch_solutions]
+        return {'forces': batch_Fz, 'solutions': batch_solutions}
 
 
 
