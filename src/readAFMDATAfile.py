@@ -6,6 +6,7 @@ import glob
 import numpy as np
 import random
 from math import sqrt, exp, pi
+import h5py
 
 
 class afmmolecule:
@@ -495,13 +496,13 @@ class AFMdata:
 
 if __name__=='__main__':
     print 'Hallo Main'
-    datafile = afmmolecule('./outputxyz/dsgdb9nsd_000485.afmdata')
-    f = open('./testsolution.npy', 'w')
-    g = open('./testsolutioncollapsed.npy', 'w')
-    h = open('./testsolutionwoH.npy', 'w')
-    j = open('./correspondingfz.npy', 'w')
-    k = open('./testsolutionnaive.npy', 'w')   
-    l = open('./testsolutionnaivecollapsed.npy','w')
+    
+    datafile = afmmolecule('../outputxyz/dsgdb9nsd_000485.afmdata')
+    out = h5py.File('../scratch/solutions000485.hdf5', 'w')
+    
+    xyz = datafile.F_orientation(0)['atomPosition']
+    np.savetxt('../scratch/positions000485.xyz', xyz, delimiter=' ')
+    
     testsols = np.zeros((10,81,81,5))
     collsols = np.zeros((10,81,81,1))
     wohsols =  np.zeros((10,81,81,5))
@@ -515,15 +516,12 @@ if __name__=='__main__':
         fz[i,:,:,:] = datafile.F_orientation(i+17)['fzarray'][:,:,:,0]
         naivesols[i,:,:,:] = datafile.solution_xymap_naive_projection(i+17)
         naivecoll[i,:,:,:] = datafile.solution_xymap_naive_collapsed(i+17)
-    np.save(f,testsols)
-    np.save(g,collsols)
-    np.save(h,wohsols)
-    np.save(j,fz)
-    np.save(k, naivesols)
-    np.save(l, naivecoll)
-    f.close()
-    g.close()
-    h.close()
-    j.close()
-    k.close()
-    l.close()
+        
+    out.create_dataset('/testsolution', data=testsols)
+    out.create_dataset('/testsolutioncollapsed', data=collsols)
+    out.create_dataset('/fzarray', data=fz)
+    out.create_dataset('/testsolutionwoH', data=wohsols)
+    out.create_dataset('/testsolutionnaive', data=naivesols)
+    out.create_dataset('/testsolutionnaivecollapsed', data=naivecoll)
+    
+    out.close()
