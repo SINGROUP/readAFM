@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --time=0-06:00:00    # 6 hours 00 minutes
+#SBATCH --mem-per-cpu=2500    # 2500MB of memory
+
+MECHAFM=$WRKDIR/MechAFM/bin/mechafm-omp
+MAKEBINARY=$WRKDIR/MechAFM/myCode/makeBinary.py
+COMPILEOUT=$WRKDIR/MechAFM/myCode/compileOut.py
+for i in *.scan; do
+    AFMOUTPUT=${i%.scan}
+    $MECHAFM $i $AFMOUTPUT
+    python $MAKEBINARY -i $i
+    rm -r $AFMOUTPUT
+    rm $i
+    rm ${AFMOUTPUT}.xyz
+done
+python $COMPILEOUT -i $PWD
+FOO=$PWD
+COMPILEDOUTFILE=$PWD/${PWD##*/}.afmdata
+mv $COMPILEDOUTFILE ../
+rm -r $FOO
