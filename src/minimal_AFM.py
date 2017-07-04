@@ -31,7 +31,7 @@ def conv3d(x, W):
 
 if __name__=='__main__':
 
-    logfile=open('out_minimal_{}.log'.format(args.name), 'w', 0)
+    logfile=open('../scratch/out_minimal_{}.log'.format(args.name), 'w', 0)
     logfile.write('Start with importing the data \n')
     # AFMdata=readAFM.afmmolecule('dsgdb9nsd_000001.afmdata')
     inputData=np.array((None,81,81,41,1))
@@ -112,8 +112,8 @@ if __name__=='__main__':
     # print(sess.run(b_conv1))
     # logfile.write('Variables initialized successfully \n')
     
-    # AFMdata = readAFM.AFMdata('./AFMDB_version_01.hdf5')
-    AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
+    AFMdata = readAFM.AFMdata('../AFMDB_version_01.hdf5')
+#     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
     
     
     # Do stochastic training:
@@ -121,28 +121,28 @@ if __name__=='__main__':
         try:
             logfile.write('Starting Run #%i \n'%(i))
             timestart=time.time()
-            batch = AFMdata.batch(50)
+            batch = AFMdata.batch_fresh_solution(1)
             logfile.write('read batch successfully \n')
     
             if i%100 == 0:
-                train_accuracy = accuracy.eval(feed_dict={Fz_xyz:batch[0], solution: batch[1], keep_prob: 1.0})
+                train_accuracy = accuracy.eval(feed_dict={Fz_xyz:batch['forces'], solution: batch['solutions'], keep_prob: 1.0})
                 logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
-                save_path=saver.save(sess, "./save/CNN_minimal_TR1_{}.ckpt".format(args.name))
+                save_path=saver.save(sess, "../save/CNN_minimal_TR1_{}.ckpt".format(args.name))
                 logfile.write("Model saved in file: %s \n" % save_path)
     
-                train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
-                timeend=time.time()
-                logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
+            train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
+            timeend=time.time()
+            logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
         except IndexError:
             print 'Index Error for this File'
     
-    testbatch = AFMdata.batch(50)
+    testbatch = AFMdata.batch(1)
     logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0}))
     
     
     # Save two np.arrays to be able to view it later.
-    viewfile_prediction=open('view_prediction_{}.npy'.format(args.name), 'w')
-    viewfile_solution=open('view_solution_{}.npy'.format(args.name), 'w')
+    viewfile_prediction=open('../scratch/view_prediction_{}.npy'.format(args.name), 'w')
+    viewfile_solution=open('../scratch/view_solution_{}.npy'.format(args.name), 'w')
     np.save(viewfile_prediction, y_conv.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}))
     np.save(viewfile_solution, testbatch['solutions'])
     viewfile_prediction.close()
