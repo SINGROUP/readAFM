@@ -114,6 +114,24 @@ class AFMdata:
             batch_solutions[i]=self.solution_xymap_collapsed(randomorientation.name)[...]
         return {'forces': batch_Fz, 'solutions': batch_solutions}
     
+    def batch_test(self, batchsize):
+        """ Returns a batch that includes the AtomPositions, s.t. a more comprehensible viewfile can be made. """
+        
+        batch_Fz=np.zeros((batchsize,81,81,41,1))   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
+        batch_solutions=np.zeros((batchsize,81,81,5))
+        batch_atomPositions=np.zeros((batchsize,30,3))
+        
+        for i in range(0,batchsize):
+            randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
+            randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
+            print 'Looking at file ' + randomorientation.name
+
+            batch_Fz[i]=randomorientation['fzvals'][...]
+            batch_solutions[i]=randomorientation['solution'][...]
+            batch_atomPositions[i]=randomorientation['atomPosition'][...]
+            
+        return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': batch_atomPositions}
+    
     
 if __name__=='__main__':
     print 'Hallo Main'
