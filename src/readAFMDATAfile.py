@@ -187,7 +187,7 @@ class afmmolecule:
             for i in range(0,divX):
                 for j in range(0,divY):
                     asd = self.afmdataFile.read(4)
-                    fzarray[i,j,h,0] = struct.unpack('f',asd)[0]
+                    fzarray[i,j,h,0] = struct.unpack('f',asd)[0]    # ATTENTION: XYZ convention!!!
                     
 #                    self.afmdataFile.seek(4*zIndex*divX*divY, 1)
 #                    self.afmdataFile.seek(4*xIndex*divY, 1)

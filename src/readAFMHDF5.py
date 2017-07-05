@@ -66,7 +66,7 @@ class AFMdata:
             """ This is not a Normal Distribution!!! It's a gauss-like distribution, but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), this is s.t. the different elements give different 'signals'. """
             # Lets try it without Normalisation
     #             return 1/sqrt(2*pi*sigma**2)*exp(-((x-xmen)**2+(y-ymean)**2+(z-zmean)**2)/sigma**2)
-            sigma = 5.0*(covalentRadii[atomNameString[i]])/76
+            sigma = 6.0*(covalentRadii[atomNameString[i]])/76
             normalisation = 1.0*(covalentRadii[atomNameString[i]])/76.
     #             normalisation = 1.0
             return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
