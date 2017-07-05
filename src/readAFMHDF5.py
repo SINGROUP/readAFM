@@ -7,7 +7,7 @@ class AFMdata:
     """ Class for opening HDF5 file. """
     def __init__(self, FileName):
         """ Opens hdf5 file for reading. """
-        self.f = h5py.File(FileName, "r")
+        self.f = h5py.File(FileName, "r+")
 
     def batch(self, batchsize):
         batch_Fz=np.zeros((batchsize,81,81,41,1))   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
@@ -97,9 +97,9 @@ class AFMdata:
         return projected_array
     
         
-    def solution_xymap_collapsed(self, orientationNumber):
+    def solution_xymap_collapsed(self, dataSetString):
         """Gives a version of the xymap solution collapsed to only one map, asking the question 'atom or not?' instead of 'What kind of atom?' """
-        return np.sum(self.solution_xymap_projection(orientationNumber),axis=-1, keepdims=True)
+        return np.sum(self.solution_xymap_projection(dataSetString),axis=-1, keepdims=True)
 
 
     def batch_fresh_solution(self, batchsize):
