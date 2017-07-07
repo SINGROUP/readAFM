@@ -97,7 +97,7 @@ if __name__=='__main__':
 #     set up evaluation system
 #     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
     cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))      
-    accuracy = cost
+    accuracy = cost/parameters['testbatchSize']
 #     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
     
     # Crate saver
@@ -135,6 +135,7 @@ if __name__=='__main__':
         viewfile.create_dataset('predictions', data=outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}))
         viewfile.create_dataset('solutions', data=testbatch['solutions'])
         viewfile.create_dataset('AtomPosition', data=testbatch['atomPosition'])
+        viewfile.create_dataset('fzvals', data=testbatch['forces'])
         viewfile.close()
         
         logfile.write('finished! \n')

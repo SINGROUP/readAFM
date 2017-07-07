@@ -77,7 +77,7 @@ def change_labels(PathToHDF5):
         print(molstr)
         for ortnstr in molecule.keys():
             orientation=molecule[ortnstr]
-            orientation['solution'][...]=f.solution_xymap_collapsed(orientation.name)[...]
+            orientation['solution'][...]=f.solution_toyDB(orientation.name)[...]
 #             del(orientation['solution'])
 #             orientation.create_dataset('solution', data=f.solution_xymap_collapsed(orientation.name))
             print(ortnstr, orientation.name)
@@ -90,14 +90,13 @@ def add_labels(PathToHDF5):
         molecule = f.f[molstr]
         for ortnstr in molecule.keys():
             orientation=molecule[ortnstr]
-            orientation.create_dataset('solution'][...]=f.solution_xymap_collapsed(orientation.name)[...]
-#             del(orientation['solution'])
-#             orientation.create_dataset('solution', data=f.solution_xymap_collapsed(orientation.name))
-            print(ortnstr, orientation.name)
+            orientation.create_dataset('solution',data=f.solution_xymap_collapsed(orientation.name)[...])
+            print('Completeded %s bzw %s' %(ortnstr, orientation.name))
         
 
 
 
 if __name__ == "__main__":
 #     convert_afmdata_to_hdf5('/l/reischt1/outputxyz_80pnts/', '/l/reischt1/AFMDB_version_02.hdf5')
-    change_labels('/l/reischt1/AFMDB_version_02.hdf5')
+#     change_labels('/l/reischt1/AFMDB_version_02.hdf5')
+    change_labels('/l/reischt1/toyDB_v06.hdf5')
