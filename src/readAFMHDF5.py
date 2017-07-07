@@ -2,6 +2,7 @@ import numpy as np
 import random
 import h5py
 from math import exp
+from numpy import zeros, shape
 
 class AFMdata:
     """ Class for opening HDF5 file. """
@@ -9,16 +10,16 @@ class AFMdata:
         """ Opens hdf5 file for reading. """
         self.f = h5py.File(FileName, "r+")
 
-    def batch(self, batchsize):
-        batch_Fz=np.zeros((batchsize,81,81,41,1))   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
-        batch_solutions=np.zeros((batchsize,81,81,5))
+    def batch(self, batchsize, shape=(81, 81, 41, 1)):
+        batch_Fz=np.zeros((batchsize,)+shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
+        batch_solutions=np.zeros((batchsize, shape[0], shape[1], shape[-1]))
         for i in range(0,batchsize):
             randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
             randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
             print 'Looking at file ' + randomorientation.name
 
-            batch_Fz[i]=randomorientation['fzvals'][...]
-            batch_solutions[i]=randomorientation['solution'][...]
+            batch_Fz[i]=randomorientation['fzvals'][...].reshape(shape)
+            batch_solutions[i]=randomorientation['solution'][...].reshape((shape[:-2]+(1,)))
         return {'forces': batch_Fz, 'solutions': batch_solutions}
     
 
@@ -66,7 +67,7 @@ class AFMdata:
             """ This is not a Normal Distribution!!! It's a gauss-like distribution, but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), this is s.t. the different elements give different 'signals'. """
             # Lets try it without Normalisation
     #             return 1/sqrt(2*pi*sigma**2)*exp(-((x-xmen)**2+(y-ymean)**2+(z-zmean)**2)/sigma**2)
-            sigma = 6.0*(covalentRadii[atomNameString[i]])/76
+            sigma = 6.0*(covalentRadii[atomNameString[i]])/76   # This i should not be here, am I right???
             normalisation = 1.0*(covalentRadii[atomNameString[i]])/76.
     #             normalisation = 1.0
             return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
@@ -101,6 +102,24 @@ class AFMdata:
         """Gives a version of the xymap solution collapsed to only one map, asking the question 'atom or not?' instead of 'What kind of atom?' """
         return np.sum(self.solution_xymap_projection(dataSetString),axis=-1, keepdims=True)
 
+    def solution_toyDB(self, orientationGroupString):
+        atomPos = self.f[orientationGroupString+'/atomPosition'][0,:]
+        
+        def atomSignal(evalvect, meanvect, atomNameString):
+            """ This is not a Normal Distribution!!! It's a gauss-like distribution, 
+            but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), 
+            this is s.t. the different elements give different 'signals'. """
+            covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
+            sigma = 0.2*(covalentRadii[atomNameString])/76
+            normalisation = 1.0*(covalentRadii[atomNameString])/76.
+            return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
+        
+        solutionArray = np.zeros((41,41,1))
+        for xindex in range(41):
+            for yindex in range(41):
+                solutionArray[xindex, yindex, 0]+=atomSignal([float(xindex)*0.2,float(yindex)*0.2,0.0*0.2], atomPos, 'C')
+                
+        return solutionArray
 
     def batch_fresh_solution(self, batchsize):
         batch_Fz=np.zeros((batchsize,81,81,41,1))   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
@@ -114,11 +133,11 @@ class AFMdata:
             batch_solutions[i]=self.solution_xymap_collapsed(randomorientation.name)[...]
         return {'forces': batch_Fz, 'solutions': batch_solutions}
     
-    def batch_test(self, batchsize):
+    def batch_test(self, batchsize, shape=(81,81,41,1)):
         """ Returns a batch that includes the AtomPositions, s.t. a more comprehensible viewfile can be made. """
         
-        batch_Fz=np.zeros((batchsize,81,81,41,1))   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
-        batch_solutions=np.zeros((batchsize,81,81,5))
+        batch_Fz=np.zeros((batchsize,)+shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
+        batch_solutions=np.zeros((batchsize,)+shape[:-2]+(1,))
         batch_atomPositions=np.zeros((batchsize,30,3))
         
         for i in range(0,batchsize):
@@ -126,8 +145,8 @@ class AFMdata:
             randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
             print 'Looking at file ' + randomorientation.name
 
-            batch_Fz[i]=randomorientation['fzvals'][...]
-            batch_solutions[i]=randomorientation['solution'][...]
+            batch_Fz[i]=randomorientation['fzvals'][...].reshape(shape)
+            batch_solutions[i]=randomorientation['solution'][...].reshape((shape[:-2]+(1,)))
             batch_atomPositions[i]=randomorientation['atomPosition'][...]
             
         return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': batch_atomPositions}
@@ -135,5 +154,6 @@ class AFMdata:
     
 if __name__=='__main__':
     print 'Hallo Main'
-    datafile = AFMdata('../AFMDB_version_01.hdf5')
-    print(datafile.batch_fresh_solution(1)['solutions'].shape)
+    datafile = AFMdata('/l/reischt1/toyDB_v05.hdf5')
+    print(datafile.batch_test(10, shape=(41,41,41,1)))
+    

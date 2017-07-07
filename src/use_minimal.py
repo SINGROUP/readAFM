@@ -18,13 +18,11 @@ args=parser.parse_args()
 print('Parsed name argument {} of type {}.'.format(args.name, type(args.name)))
 print('Parsing parameters from {}'.format(args.input_file))
 
-parameters = {'restorePath': None,                                                     # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
-              'savePath': "../save/CNN_minimal_TR1_{}.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
+parameters = {'restorePath': "../save/CNN_minimal_TR1_{}.ckpt".format(args.name),                                                     # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
+              'savePath': None,         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
               'DBPath': '../AFMDB_version_01.hdf5',
               'viewPath': '../scratch/viewfile_{}.hdf5'.format(args.name),
               'logPath': '../scratch/out_minimal_{}.log'.format(args.name),
-              'trainstepsNumber': 1001,
-              'trainbatchSize':50,
               'testbatchSize': 50}          
 
 
@@ -99,8 +97,6 @@ if __name__=='__main__':
 #     set up evaluation system
 #     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
     cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))      
-    train_step = tf.train.AdamOptimizer(0.001).minimize(cost)
-
     accuracy = cost
 #     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
     
@@ -112,7 +108,7 @@ if __name__=='__main__':
     
     # Start session
     logfile.write('it worked so far, now start session \n')
-    sess = tf.InteractiveSession()
+    
     with tf.Session() as sess:
         init_op.run()
     
@@ -128,35 +124,10 @@ if __name__=='__main__':
             logfile.write('Variables initialized successfully \n')
         
         AFMdata = readAFM.AFMdata(parameters['DBPath'])
-    #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
-        
-        
-        # Do stochastic training:
-        for i in range(parameters['trainstepsNumber']):
-            try:
-                logfile.write('Starting Run #%i \n'%(i))
-                timestart=time.time()
-                batch = AFMdata.batch(parameters['trainbatchSize'])
-                logfile.write('read batch successfully \n')
-        
-                if i%100 == 0:
-                    train_accuracy = accuracy.eval(feed_dict={Fz_xyz:batch['forces'], solution: batch['solutions'], keep_prob: 1.0})
-                    logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
-                    if parameters['savePath']:
-                        save_path=saver.save(sess, parameters['savePath'])
-                        logfile.write("Model saved in file: %s \n" % save_path)
-        
-                train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
-                timeend=time.time()
-                logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
-            except IndexError:
-                print 'Index Error for this File'
-                logfile.write('Caught Index Error')
         
         testbatch = AFMdata.batch_test(parameters['testbatchSize'])
         testaccuracy=accuracy.eval(feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0})
         logfile.write("test accuracy %g \n"%testaccuracy)
-        
         
         # Save two np.arrays to be able to view it later.
         viewfile = h5py.File(parameters['viewPath'], 'w')
@@ -165,7 +136,6 @@ if __name__=='__main__':
         viewfile.create_dataset('solutions', data=testbatch['solutions'])
         viewfile.create_dataset('AtomPosition', data=testbatch['atomPosition'])
         viewfile.close()
-
         
         logfile.write('finished! \n')
         logfile.close()
