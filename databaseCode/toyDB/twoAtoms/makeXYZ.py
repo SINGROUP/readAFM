@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import os
 import subprocess
 # from time import sleep
@@ -7,12 +7,19 @@ import subprocess
 
 def makeIt(output_folder = "randomRotateOutput/"):
     fileNumber = 0
-    for x in range(41):
-        for y in range(41):
+    
+    for i in range(24):                         # COM of xyz file will be at 0, 0, 0. The position of one atom will be defined at some point determined by the values of i and j. i specifies distance from origin, which is between 0.6 and 3.0 at steps of 0.1. Implies 24 points
+        for j in range(72):                     # There will be 72 different rotations. Each rotation is separated from the adjacent orientation by 5 degrees
 
-            xyzOut = '''1
+            distanceFromOrigin = 0.6 + i*0.1
+            angularOrientation = 5*j*np.pi/180.0            #In radians
+            x = distanceFromOrigin * np.cos(angularOrientation)
+            y = distanceFromOrigin * np.sin(angularOrientation)
 
-C %s %s 0.0''' % (x*0.2, y*0.2)
+            xyzOut = '''2
+
+C %s %s 0.0
+C %s %s 0.0''' % (x, y, -x, -y)
 
             scanOut = '''xyzfile    %s
 paramfile    parameters.dat
@@ -37,17 +44,17 @@ rigidgrid    off
 flexible     off
 
 area         8.0 8.0
-center       %s %s
+center       4.0 4.0
 
 zhigh        10.0
 zlow         6.0
-dx           %s
-dy           %s
+dx           0.2
+dy           0.2
 dz           0.1
 
 bufsize      10000
 gzip         off
-statistics   on''' % (str(fileNumber) + ".xyz", x*0.2, y*0.2, 0.2, 0.2)
+statistics   on''' % (str(fileNumber) + ".xyz")
 
             parametersContent = '''# Parameters for a system from a paper
 
@@ -68,7 +75,7 @@ atom    T         0.19200              3.15000       15.99900      -0.02100
 # Pair style to overwrite and default LJ-mixing
 #            atom1  |  atom2  |  pair_style  |  parameters (eps,sig for LJ; De,a,re for Morse)
 # pair_ovwrt     C        T         morse          1 2 3
-# pair_ovwrt     H        T         lj             1 2
+pair_ovwrt     X        T         lj       20.0000   3.5500
 
 # Tip harmonic constraint
 #     force constant (kcal/mol)  | distance (A)
