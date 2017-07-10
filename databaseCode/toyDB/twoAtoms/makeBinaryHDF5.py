@@ -92,7 +92,7 @@ dxyz[0] = dx
 dxyz[1] = dy
 dxyz[2] = dz
 
-fzarray = np.zeros((divZ, divX, divY), np.float32)
+fzarray = np.zeros((divX, divY, divZ, 1), np.float32)
 
 #outFile.write(struct.pack('f', widthZ))
 #outFile.write(struct.pack('f', widthX))
@@ -124,7 +124,7 @@ for datFilePath in pathsToDATFiles:
     for i in range(0, datFileContentsLength):
         xIndex = int(datFileContents[i].split()[1])
         yIndex = int(datFileContents[i].split()[2])
-        fzarray[xIndex, yIndex, zIndex] = float(datFileContents[i].split()[8])
+        fzarray[xIndex, yIndex, zIndex, 0] = float(datFileContents[i].split()[8])
 
         #outFile.write(struct.pack('f', float(datFileContents[i].split()[8])))          #Dumps f Z
     zIndex += 1

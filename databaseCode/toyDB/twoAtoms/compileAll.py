@@ -3,7 +3,7 @@ import h5py
 
 f = h5py.File("db.hdf5", "a")
 
-for i in range(1681):
+for i in range(1728):
     g = h5py.File("%d/%d.hdf5"%(i,i), "r")
     f.create_group('molecule' + str(i))
     orientationstring = 'molecule' + str(i) + "/orientation1"

@@ -4,7 +4,7 @@
 #SBATCH -p debug
 
 MECHAFM=$WRKDIR/MechAFM/bin/mechafm-omp
-MAKEBINARY=$WRKDIR/varmad1/MechAFM/myCode/toyDB/makeBinaryHDF5.py
+MAKEBINARY=$WRKDIR/varmad1/MechAFM/myCode/toyDB/twoAtoms/makeBinaryHDF5.py
 
 for i in *.scan; do
     $MECHAFM $i ./
