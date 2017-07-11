@@ -18,7 +18,7 @@ args=parser.parse_args()
 print('Parsed name argument {} of type {}.'.format(args.name, type(args.name)))
 print('Parsing parameters from {}'.format(args.input_file))
 
-parameters = {'restorePath': "../save/CNN_minimal_TR1_{}.ckpt".format(args.name),                                                     # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
+parameters = {'restorePath': "../save/CNN_minimal_TR1_00.ckpt",                                                     # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
               'savePath': None,         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
               'DBPath': '../AFMDB_version_01.hdf5',
               'viewPath': '../scratch/viewfile_{}.hdf5'.format(args.name),

@@ -23,10 +23,12 @@ parameters = {'restorePath': None,                                              
               'DBPath': '../AFMDB_version_01.hdf5',
               'viewPath': '../scratch/viewfile_{}.hdf5'.format(args.name),
               'logPath': '../scratch/out_minimal_{}.log'.format(args.name),
-              'trainstepsNumber': 1001,
-              'trainbatchSize':50,
-              'testbatchSize': 50}          
+              'trainstepsNumber': 1,
+              'trainbatchSize':1,
+              'testbatchSize': 1,
+              'logdir': '../save{}/'.format(args.name)}          
 
+LOGDIR = parameters['logdir']
 
 # Here smt like parameters.update(parsedParameters)
 
@@ -59,49 +61,69 @@ if __name__=='__main__':
 
 
     logfile.write('define the first two placeholders \n')
-    solution = tf.placeholder(tf.float32, [None, 81, 81, 5])
+    solution = tf.placeholder(tf.float32, [None, 81, 81, 1])
     Fz_xyz = tf.placeholder(tf.float32, [None, 81, 81, 41, 1])
-
-    convVars_1 = {'weights': weight_variable([4,4,4,1,16], 'wcv1'),
-                    'biases': bias_variable([16], 'bcv1')}
-
-    convVars_2 = {'weights': weight_variable([4, 4, 4, 16, 32], 'wcv2'),
-                    'biases': bias_variable([32], 'bcv2')}
-
-    fcVars_1 = {'weights': weight_variable([41*32, 64], 'wfc1'),
-                    'biases': bias_variable([81, 81, 64], 'bfc1')}
-
-    outputVars = {'weights': weight_variable([64, 5], 'wout'),
-                    'biases': bias_variable([81, 81, 5], 'bout')}
-
+    tf.summary.image('Fzinput_0', Fz_xyz[:,:,:,0,:], 5)
+    tf.summary.image('Fzinput_20', Fz_xyz[:,:,:,20,:], 5)
+    tf.summary.image('Fzinput_40', Fz_xyz[:,:,:,40,:], 5)
 
     logfile.write('now define conv1 \n')
     #1st conv layer: Convolve the input (Fz_xyz) with 16 different filters, don't do maxpooling!  
-    convLayer_1 = tf.nn.tanh(tf.add(conv3d(Fz_xyz, convVars_1['weights']),convVars_1['biases']))
+    with tf.name_scope('conv1'):
+        w_conv1 = weight_variable([4,4,4,1,16], 'wcv1')
+        b_conv1 = bias_variable([16], 'bcv1')
+        convLayer_1 = tf.nn.tanh(tf.add(conv3d(Fz_xyz, w_conv1),b_conv1))
+        tf.summary.histogram("weights", w_conv1)
+        tf.summary.histogram("biases", b_conv1)
+        tf.summary.histogram("activations", convLayer_1)
 
     logfile.write('defining conv2 \n')
     #2nd conv layer: Convolve the result from layer 1 with 32 different filters, don't do maxpooling!
-    convLayer_2 = tf.nn.tanh(tf.add(conv3d(convLayer_1, convVars_2['weights']),convVars_2['biases']))
-        
+    with tf.name_scope('conv2'):
+        w_conv2 = weight_variable([4, 4, 4, 16, 32], 'wcv2')
+        b_conv2 =  bias_variable([32], 'bcv2')
+        convLayer_2 = tf.nn.tanh(tf.add(conv3d(convLayer_1, w_conv2),b_conv2))
+        tf.summary.histogram("weights", w_conv2)
+        tf.summary.histogram("biases", b_conv2)
+        tf.summary.histogram("activations", convLayer_2)
+                
     logfile.write('all conv layers defined, defining fc layer \n')
     # fc 1   
-    convLayer_2_flat = tf.reshape(convLayer_2, [-1, 81, 81, 41*32])
-    fcLayer_1 = tf.nn.relu(tf.tensordot(convLayer_2_flat, fcVars_1['weights'],axes=[[3],[0]])+fcVars_1['biases'])  #Is this correct? the result of the tensordot and the b_fc1 don't have the same dimensions
+    with tf.name_scope('fc'):
+        w_fc1 = weight_variable([41*32, 64], 'wfc1')
+        b_fc1 = bias_variable([81, 81, 64], 'bfc1')
+        convLayer_2_flat = tf.reshape(convLayer_2, [-1, 81, 81, 41*32])
+        fcLayer_1 = tf.nn.relu(tf.tensordot(convLayer_2_flat, w_fc1,axes=[[3],[0]])+b_fc1)  #Is this correct? the result of the tensordot and the b_fc1 don't have the same dimensions
+        tf.summary.histogram("weights", w_fc1)
+        tf.summary.histogram("biases", b_fc1)
+        tf.summary.histogram("activations", fcLayer_1)
     
     # Dropout
-    keep_prob = tf.placeholder(tf.float32)
-    fcLayer_1_dropout = tf.nn.dropout(fcLayer_1, keep_prob)
+    with tf.name_scope('dropout'):
+        keep_prob = tf.placeholder(tf.float32)
+        fcLayer_1_dropout = tf.nn.dropout(fcLayer_1, keep_prob)
     
     # Readout Layer
-    outputLayer = tf.nn.relu(tf.add(tf.tensordot(fcLayer_1_dropout, outputVars['weights'], axes=[[3],[0]]), outputVars['biases']))
-
+    with tf.name_scope('outputLayer'):
+        w_out = weight_variable([64, 5], 'wout')
+        b_out = bias_variable([81, 81, 5], 'bout')
+        outputLayer = tf.nn.relu(tf.add(tf.tensordot(fcLayer_1_dropout, w_out, axes=[[3],[0]]), b_out))
+        tf.summary.histogram("weights", w_out)
+        tf.summary.histogram("biases", b_out)
+        tf.summary.histogram("activations", outputLayer)        
 
 #     set up evaluation system
 #     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
-    cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))      
-    train_step = tf.train.AdamOptimizer(0.001).minimize(cost)
+    with tf.name_scope('cost'):
+        cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))
+        tf.summary.scalar('cost', cost)
 
-    accuracy = cost
+    with tf.name_scope('train'):
+        train_step = tf.train.AdamOptimizer(0.001).minimize(cost)
+
+    with tf.name_scope('accuracy'):
+        accuracy = cost
+        tf.summary.scalar('accuracy',accuracy)
 #     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
     
     # Crate saver
@@ -112,24 +134,27 @@ if __name__=='__main__':
     
     # Start session
     logfile.write('it worked so far, now start session \n')
-    sess = tf.InteractiveSession()
+
+    summ = tf.summary.merge_all()
+
     with tf.Session() as sess:
         init_op.run()
     
         print("b_conv1, as initialized: ")
-        print(sess.run(convVars_1['biases']))
+        print(sess.run(b_conv1))
                 
 #         Pack this into a function!
         if parameters['restorePath']:
             saver.restore(sess, parameters['restorePath'])
             logfile.write("Model restored. \n")
             print("Model restored. See here b_conv1 restored:")
-            print(sess.run(convVars_1['biases']))
+            print(sess.run(b_conv1))
             logfile.write('Variables initialized successfully \n')
         
         AFMdata = readAFM.AFMdata(parameters['DBPath'])
     #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
-        
+        writer = tf.summary.FileWriter(LOGDIR)
+        writer.add_graph(sess.graph)        
         
         # Do stochastic training:
         for i in range(parameters['trainstepsNumber']):
@@ -140,12 +165,13 @@ if __name__=='__main__':
                 logfile.write('read batch successfully \n')
         
                 if i%100 == 0:
-                    train_accuracy = accuracy.eval(feed_dict={Fz_xyz:batch['forces'], solution: batch['solutions'], keep_prob: 1.0})
+                    [train_accuracy, s] = sess.run([accuracy, summ], feed_dict={Fz_xyz:batch['forces'], solution: batch['solutions'], keep_prob: 1.0})
                     logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
+                    writer.add_summary(s, i)
                     if parameters['savePath']:
-                        save_path=saver.save(sess, parameters['savePath'])
+                        save_path=saver.save(sess, parameters['savePath'], i)
                         logfile.write("Model saved in file: %s \n" % save_path)
-        
+
                 train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
                 timeend=time.time()
                 logfile.write('ran train step in %f seconds \n' % (timeend-timestart))

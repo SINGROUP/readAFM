@@ -18,10 +18,10 @@ class AFMdata:
             randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
             print 'Looking at file ' + randomorientation.name
 
-            batch_Fz[i]=randomorientation['fzvals'][...].reshape(shape)
-            batch_solutions[i]=randomorientation['solution'][...].reshape((shape[:-2]+(1,)))
+            batch_Fz[i]=randomorientation['fzvals'][...] #.reshape(shape)
+            batch_solutions[i]=np.sum(randomorientation['solution'][...], axis=-1, keepdims=True) #.reshape((shape[:-2]+(1,)))
         return {'forces': batch_Fz, 'solutions': batch_solutions}
-    
+   
 
     def solution_xymap_projection(self, datasetString):
         """Returns solution to train. Project the atom positions on the xy-plane with Amplitudes decaying like a Gaussian with the radius as variance. and write it on the correct level of the np-array.
@@ -67,7 +67,7 @@ class AFMdata:
             """ This is not a Normal Distribution!!! It's a gauss-like distribution, but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), this is s.t. the different elements give different 'signals'. """
             # Lets try it without Normalisation
     #             return 1/sqrt(2*pi*sigma**2)*exp(-((x-xmen)**2+(y-ymean)**2+(z-zmean)**2)/sigma**2)
-            sigma = 6.0*(covalentRadii[atomNameString[i]])/76   # This i should not be here, am I right???
+            sigma = 4.0*(covalentRadii[atomNameString[i]])/76   # This i should not be here, am I right???
             normalisation = 1.0*(covalentRadii[atomNameString[i]])/76.
     #             normalisation = 1.0
             return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
@@ -110,7 +110,7 @@ class AFMdata:
             but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), 
             this is s.t. the different elements give different 'signals'. """
             covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
-            sigma = 0.2*(covalentRadii[atomNameString])/76
+            sigma = 1.0*(covalentRadii[atomNameString])/76
             normalisation = 1.0*(covalentRadii[atomNameString])/76.
             return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
         
@@ -146,9 +146,9 @@ class AFMdata:
             print 'Looking at file ' + randomorientation.name
 
             batch_Fz[i]=randomorientation['fzvals'][...].reshape(shape)
-            batch_solutions[i]=randomorientation['solution'][...].reshape((shape[:-2]+(1,)))
+#             batch_solutions[i]=randomorientation['solution'][...].reshape((shape[:-2]+(1,)))
             batch_atomPositions[i]=randomorientation['atomPosition'][...]
-            
+            batch_solutions[i]=np.sum(randomorientation['solution'][...], axis=-1, keepdims=True) #.reshape((shape[:-2]+(1,)            
         return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': batch_atomPositions}
     
     

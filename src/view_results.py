@@ -166,6 +166,6 @@ if __name__ == '__main__':
 #     make_plot(f['molecule25/orientation1/fzvals'][:,:,0])
 #     make_plot(f['molecule600/orientation1/fzvals'][:,:,0])
 #     make_plot(f['molecule980/orientation1/fzvals'][:,:,0])
-    f=h5py.File('/l/reischt1/toyDB_v06.hdf5', 'r')
+    f=h5py.File('/l/reischt1/twoAtoms.hdf5', 'r')
     print f.keys()
-    view_2(f['molecule100/orientation1/fzvals'][:,:,40], f['molecule100/orientation1/solution'][:,:,0])
+    view_2(f['molecule101/orientation1/fzvals'][:,:,20,0], f['molecule101/orientation1/fzvals'][:,:,35,0])

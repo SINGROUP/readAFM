@@ -32,7 +32,6 @@ class afmmolecule:
         fz = 0.0            #value of force in z direction will be stored here
         tipPosition = [0.0, 0.0, 0.0]           #position of tip will be stored here in the order z then x then y
         atomNameString = ""         #All the atoms in this molecule will be stored here. For example "CHHHH"
-        atomPosition = np.zeros((30,3))         #30 being max number of atoms in molecule. 3 standing for x, y, z positions
         widthZ = 0.0
         widthX = 0.0
         widthY = 0.0
@@ -50,6 +49,8 @@ class afmmolecule:
         asd = self.afmdataFile.read(4)
         self.numAtoms = struct.unpack('i', asd)[0]  #total number of atoms
         # print 'Number of Atoms: ', self.numAtoms
+
+        atomPosition = np.zeros((self.numAtoms,3))         #30 being max number of atoms in molecule. 3 standing for x, y, z positions
 
 
         self.afmdataFile.seek(-4, 1)         #To go back to the beginning of the file. Ignoring the first line, which specifies the number of orientations
