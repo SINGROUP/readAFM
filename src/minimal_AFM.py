@@ -18,8 +18,9 @@ args=parser.parse_args()
 print('Parsed name argument {} of type {}.'.format(args.name, type(args.name)))
 print('Parsing parameters from {}'.format(args.input_file))
 
-parameters = {'restorePath': None,                                                     # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
-              'savePath': "../save/CNN_minimal_TR1_{}.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
+parameters = {'restorePath': '../save01/CNN_minimal_TR1.ckpt-0',                                                # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
+              'savePath': None,         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
+#               'savePath': "../save{}/CNN_minimal_TR1.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
               'DBPath': '../AFMDB_version_01.hdf5',
               'DBShape': [81,81,41,1],
               'outChannels': 1,
@@ -28,7 +29,8 @@ parameters = {'restorePath': None,                                              
               'trainstepsNumber': 1,
               'trainbatchSize':1,
               'testbatchSize': 1,
-              'logdir': '../save{}/'.format(args.name)}          
+              'logdir': '../save{}/'.format(args.name),
+              'infoString': 'testrun_local_{}'.format(args.name)}
 
 LOGDIR = parameters['logdir']
 DBShape = parameters['DBShape']
@@ -59,22 +61,7 @@ def conv3d(x, W):
     """ Short definition of the convolution function for 3d """
     return tf.nn.conv3d(x, W, strides=[1,1,1,1,1], padding='SAME')
 
-
-
-if __name__=='__main__':
-
-    logfile=open(parameters['logPath'], 'w', 0)
-
-
-    logfile.write('define the first two placeholders \n')
-    solution = tf.placeholder(tf.float32, [None,]+DBShape[:2]+[outChannels])
-    tf.summary.image('solutions', solution, 5)
-
-    Fz_xyz = tf.placeholder(tf.float32, [None,]+DBShape)
-    tf.summary.image('Fzinput_0', Fz_xyz[:,:,:,0,:], 5)
-    tf.summary.image('Fzinput_half', Fz_xyz[:,:,:,int(Fz_xyz.shape[2]/2),:], 5)
-    tf.summary.image('Fzinput_last', Fz_xyz[:,:,:,-1,:], 5)
-    print(int(Fz_xyz.shape[2]/2))
+def define_model(Fz_xyz, logfile):
 
     logfile.write('now define conv1 \n')
     #1st conv layer: Convolve the input (Fz_xyz) with 16 different filters, don't do maxpooling!  
@@ -109,7 +96,6 @@ if __name__=='__main__':
     
     # Dropout
     with tf.name_scope('dropout'):
-        keep_prob = tf.placeholder(tf.float32)
         fcLayer_1_dropout = tf.nn.dropout(fcLayer_1, keep_prob)
     
     # Readout Layer
@@ -121,21 +107,26 @@ if __name__=='__main__':
         tf.summary.histogram("biases", b_out)
         tf.summary.histogram("activations", outputLayer)
         tf.summary.image('predictions', outputLayer, 5)
-        
 
+    return outputLayer
+
+def train_model(Fz_xyz, solution, keep_prob, logfile):
+    # Define model:
+    outputLayer = define_model(Fz_xyz, logfile)
+    
 #     set up evaluation system
 #     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
     with tf.name_scope('cost'):
         cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))
         tf.summary.scalar('cost', cost)
 
-    with tf.name_scope('train'):
-        train_step = tf.train.AdamOptimizer(0.001).minimize(cost)
-
     with tf.name_scope('accuracy'):
         accuracy = cost
         tf.summary.scalar('accuracy',accuracy)
 #     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
+    
+    with tf.name_scope('train'):
+        train_step = tf.train.AdamOptimizer(0.001).minimize(cost)
     
     # Crate saver
     saver = tf.train.Saver()
@@ -151,20 +142,20 @@ if __name__=='__main__':
     with tf.Session() as sess:
         init_op.run()
     
-        print("b_conv1, as initialized: ")
-        print(sess.run(b_conv1))
+#         print("b_conv1, as initialized: ")
+#         print(sess.run(b_conv1))
                 
 #         Pack this into a function!
         if parameters['restorePath']:
             saver.restore(sess, parameters['restorePath'])
             logfile.write("Model restored. \n")
             print("Model restored. See here b_conv1 restored:")
-            print(sess.run(b_conv1))
+#             print(sess.run(b_conv1))
             logfile.write('Variables initialized successfully \n')
         
         AFMdata = readAFM.AFMdata(parameters['DBPath'])
     #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
-        writer = tf.summary.FileWriter(LOGDIR)
+        writer = tf.summary.FileWriter(LOGDIR+parameters['infoString'])
         writer.add_graph(sess.graph)        
         
         # Do stochastic training:
@@ -194,19 +185,95 @@ if __name__=='__main__':
         testaccuracy=accuracy.eval(feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0})
         logfile.write("test accuracy %g \n"%testaccuracy)
         
-        solpics = outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0})
-
-
-
         # Save two np.arrays to be able to view it later.
         viewfile = h5py.File(parameters['viewPath'], 'w')
         viewfile.attrs['testaccuracy']=testaccuracy
+        viewfile.attrs['infoString']=parameters['infoString']
         viewfile.create_dataset('predictions', data=outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}))
         viewfile.create_dataset('solutions', data=testbatch['solutions'])
         viewfile.create_dataset('AtomPosition', data=testbatch['atomPosition'])
         viewfile.close()
+        
+    return 0
+
+def eval_model(Fz_xyz, solution, keep_prob, logfile):
+    # Define model:
+    outputLayer = define_model(Fz_xyz, logfile)
+    
+#     set up evaluation system
+#     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
+    with tf.name_scope('cost'):
+        cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))
+        tf.summary.scalar('cost', cost)
+
+    with tf.name_scope('accuracy'):
+        accuracy = cost
+        tf.summary.scalar('accuracy',accuracy)
+#     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
+
+    # Crate saver
+    saver = tf.train.Saver()
+    
+    # Init op
+    init_op = tf.global_variables_initializer()
+    
+    # Start session
+    logfile.write('it worked so far, now start session \n')
+
+    summ = tf.summary.merge_all()
+
+    with tf.Session() as sess:
+        init_op.run()
+    
+        if parameters['restorePath']:
+            saver.restore(sess, parameters['restorePath'])
+            logfile.write("Model restored. \n")
+            print("Model restored.")
+            logfile.write('Variables initialized successfully \n')
+        
+        AFMdata = readAFM.AFMdata(parameters['DBPath'])
+    #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
+        writer = tf.summary.FileWriter(LOGDIR+parameters['infoString'])
+        writer.add_graph(sess.graph)        
+        testbatch = AFMdata.batch_test(parameters['testbatchSize'])
+        [testaccuracy, s] = sess.run([accuracy, summ],feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0})     
+
+        logfile.write("test accuracy %g \n"%testaccuracy)
+        writer.add_summary(s)
+        
+        # Save two np.arrays to be able to view it later.
+        viewfile = h5py.File(parameters['viewPath'], 'w')
+        viewfile.attrs['testaccuracy']=testaccuracy
+        viewfile.attrs['infoString']=parameters['infoString']
+        viewfile.create_dataset('predictions', data=outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}))
+        viewfile.create_dataset('solutions', data=testbatch['solutions'])
+        viewfile.create_dataset('AtomPosition', data=testbatch['atomPosition'])
+        viewfile.close()
+        
+    return 0
+
+
+
+if __name__=='__main__':
+
+    logfile=open(parameters['logPath'], 'w', 0)
+
+    logfile.write('define the  placeholders \n')
+    Fz_xyz = tf.placeholder(tf.float32, [None,]+DBShape)
+    tf.summary.image('Fzinput_0', Fz_xyz[:,:,:,0,:], 5)
+    tf.summary.image('Fzinput_half', Fz_xyz[:,:,:,int(Fz_xyz.shape[2]/2),:], 5)
+    tf.summary.image('Fzinput_last', Fz_xyz[:,:,:,-1,:], 5)
+    print(int(Fz_xyz.shape[2]/2))
+    
+    solution = tf.placeholder(tf.float32, [None,]+DBShape[:2]+[outChannels])
+    tf.summary.image('solutions', solution, 5)
+
+    keep_prob = tf.placeholder(tf.float32)
+
+#     train_model(Fz_xyz, solution, keep_prob, logfile)
+    eval_model(Fz_xyz, solution, keep_prob, logfile)
 
         
-        logfile.write('finished! \n')
-        logfile.close()
-        print 'Finished!'
+    logfile.write('finished! \n')
+    logfile.close()
+    print 'Finished!'

@@ -99,4 +99,4 @@ def add_labels(PathToHDF5):
 if __name__ == "__main__":
 #     convert_afmdata_to_hdf5('/l/reischt1/outputxyz_80pnts/', '/l/reischt1/AFMDB_version_02.hdf5')
 #     change_labels('/l/reischt1/AFMDB_version_02.hdf5')
-    add_labels('/l/reischt1/toyDB_v07.hdf5')
+    add_labels('/l/reischt1/threeAtoms.hdf5')
