@@ -19,7 +19,7 @@ def makeIt(output_folder = "randomRotateOutput/"):
             xyzOut = '''2
 
 C %s %s 0.0
-C %s %s 0.0''' % (x, y, -x, -y)
+H %s %s 0.0''' % (x, y, -x, -y)
 
             scanOut = '''xyzfile    %s
 paramfile    parameters.dat

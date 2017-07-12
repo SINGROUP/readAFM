@@ -1,4 +1,4 @@
-import numpy as np
+import numpy
 import os
 import subprocess
 # from time import sleep
@@ -7,19 +7,12 @@ import subprocess
 
 def makeIt(output_folder = "randomRotateOutput/"):
     fileNumber = 0
-    
-    for i in range(24):                         # COM of xyz file will be at 0, 0, 0. The position of one atom will be defined at some point determined by the values of i and j. i specifies distance from origin, which is between 0.6 and 3.0 at steps of 0.1. Implies 24 points
-        for j in range(72):                     # There will be 72 different rotations. Each rotation is separated from the adjacent orientation by 5 degrees
+    for x in range(41):
+        for y in range(41):
 
-            distanceFromOrigin = 0.6 + i*0.1
-            angularOrientation = 5*j*np.pi/180.0            #In radians
-            x = distanceFromOrigin * np.cos(angularOrientation)
-            y = distanceFromOrigin * np.sin(angularOrientation)
+            xyzOut = '''1
 
-            xyzOut = '''2
-
-C %s %s 0.0
-C %s %s 0.0''' % (x, y, -x, -y)
+C %s %s 0.0''' % (x*0.2, y*0.2)
 
             scanOut = '''xyzfile    %s
 paramfile    parameters.dat
@@ -44,17 +37,17 @@ rigidgrid    off
 flexible     off
 
 area         8.0 8.0
-center       4.0 4.0
+center       %s %s
 
 zhigh        10.0
 zlow         6.0
-dx           0.2
-dy           0.2
+dx           %s
+dy           %s
 dz           0.1
 
 bufsize      10000
 gzip         off
-statistics   on''' % (str(fileNumber) + ".xyz")
+statistics   on''' % (str(fileNumber) + ".xyz", x*0.2 + 0.01, y*0.2 + 0.01, 0.2, 0.2)
 
             parametersContent = '''# Parameters for a system from a paper
 
@@ -66,7 +59,7 @@ atom    N         0.19200              3.31988       14.00670       0.00000
 atom    S         0.43560              3.63599       32.06500       0.00000
 atom    F         0.11080              2.90789       18.99840       0.00000
 atom    B         0.10500              3.63000       10.81000       0.00000
-atom    X         0.07000              3.55000       12.01100       0.02100
+atom    X        20.00000              3.55000       12.01100       0.02100
 atom    T         0.19200              3.15000       15.99900      -0.02100
 
 # Boron parameters guessed from Baowan & Hill, IET Micro & Nano Letters 2:46 (2007)
@@ -75,7 +68,7 @@ atom    T         0.19200              3.15000       15.99900      -0.02100
 # Pair style to overwrite and default LJ-mixing
 #            atom1  |  atom2  |  pair_style  |  parameters (eps,sig for LJ; De,a,re for Morse)
 # pair_ovwrt     C        T         morse          1 2 3
-pair_ovwrt     X        T         lj       20.0000   3.5500
+# pair_ovwrt     H        T         lj             1 2
 
 # Tip harmonic constraint
 #     force constant (kcal/mol)  | distance (A)

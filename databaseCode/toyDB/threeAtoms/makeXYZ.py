@@ -8,20 +8,30 @@ import subprocess
 def makeIt(output_folder = "randomRotateOutput/"):
     fileNumber = 0
     
-    for i in range(24):                         # COM of xyz file will be at 0, 0, 0. The position of one atom will be defined at some point determined by the values of i and j. i specifies distance from origin, which is between 0.6 and 3.0 at steps of 0.1. Implies 24 points
-        for j in range(72):                     # There will be 72 different rotations. Each rotation is separated from the adjacent orientation by 5 degrees
+    for i1 in range(5):                         # bond length from 1.2 to 3.2 with one atom at origin
+        for i2 in range(5):
+            for j1 in range(24):                 # angle from 0 to 360 with shifts of 15 degrees
+                for j2 in range(16):             # angle from j1 + 60 to j1 + 300
 
-            distanceFromOrigin = 0.6 + i*0.1
-            angularOrientation = 5*j*np.pi/180.0            #In radians
-            x = distanceFromOrigin * np.cos(angularOrientation)
-            y = distanceFromOrigin * np.sin(angularOrientation)
+                    x1 = 0.0
+                    y1 = 0.0
+                    distance1 = 1.2 + 0.4*i1
+                    distance2 = 1.2 + 0.4*i2
+                    angle1 = 15*j1*np.pi/180
+                    angle2 = angle1 + 60 + 15*j2*np.pi/180
 
-            xyzOut = '''2
+                    x2 = distance1 * np.cos(angle1)
+                    y2 = distance1 * np.sin(angle1)
+                    x3 = distance2 * np.cos(angle2)
+                    y3 = distance2 * np.sin(angle2)
+
+                    xyzOut = '''3
 
 C %s %s 0.0
-C %s %s 0.0''' % (x, y, -x, -y)
+C %s %s 0.0
+C %s %s 0.0''' % (x1, y1, x2, y2, x3, y3)
 
-            scanOut = '''xyzfile    %s
+                    scanOut = '''xyzfile    %s
 paramfile    parameters.dat
 tipatom      T
 dummyatom    X
@@ -56,7 +66,7 @@ bufsize      10000
 gzip         off
 statistics   on''' % (str(fileNumber) + ".xyz")
 
-            parametersContent = '''# Parameters for a system from a paper
+                    parametersContent = '''# Parameters for a system from a paper
 
 #      name  |  epsilon (kcal/mol)  |  sigma (A)  |  mass (amu)  |  charge (e)
 atom    C         0.07000              3.55000       12.01100       0.00000
@@ -107,19 +117,19 @@ substrate         0.100                 3.0         3.0          7.5        0.01
 
 
 
-            os.makedirs(output_folder + str(fileNumber))
+                    os.makedirs(output_folder + str(fileNumber))
             
-            xyzFile = open(output_folder + str(fileNumber) + "/"  + str(fileNumber) + ".xyz", "w+")
-            xyzFile.write(xyzOut)
+                    xyzFile = open(output_folder + str(fileNumber) + "/"  + str(fileNumber) + ".xyz", "w+")
+                    xyzFile.write(xyzOut)
 
-            scanFile = open(output_folder + str(fileNumber) + "/"  + str(fileNumber) + ".scan", "w+")
-            scanFile.write(scanOut)
+                    scanFile = open(output_folder + str(fileNumber) + "/"  + str(fileNumber) + ".scan", "w+")
+                    scanFile.write(scanOut)
             
-            paraFile = open(output_folder + str(fileNumber) + "/"  + "parameters.dat", "w+")
-            paraFile.write(parametersContent)
+                    paraFile = open(output_folder + str(fileNumber) + "/"  + "parameters.dat", "w+")
+                    paraFile.write(parametersContent)
 
-            xyzFile.close()
-            scanFile.close()
-            paraFile.close()
-            print("done with file number " + str(fileNumber))
-            fileNumber += 1
+                    xyzFile.close()
+                    scanFile.close()
+                    paraFile.close()
+                    print("done with file number " + str(fileNumber))
+                    fileNumber += 1

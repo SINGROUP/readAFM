@@ -44,7 +44,7 @@ rigidgrid    off
 flexible     off
 
 area         8.0 8.0
-center       4.0 4.0
+center       4.01 4.01
 
 zhigh        10.0
 zlow         6.0
