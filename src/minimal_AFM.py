@@ -62,10 +62,13 @@ if __name__=='__main__':
 
     logfile.write('define the first two placeholders \n')
     solution = tf.placeholder(tf.float32, [None, 81, 81, 1])
+    tf.summary.image('solutions', solution, 5)
+
     Fz_xyz = tf.placeholder(tf.float32, [None, 81, 81, 41, 1])
     tf.summary.image('Fzinput_0', Fz_xyz[:,:,:,0,:], 5)
-    tf.summary.image('Fzinput_20', Fz_xyz[:,:,:,20,:], 5)
-    tf.summary.image('Fzinput_40', Fz_xyz[:,:,:,40,:], 5)
+    tf.summary.image('Fzinput_half', Fz_xyz[:,:,:,int(Fz_xyz.shape[2]/2),:], 5)
+    tf.summary.image('Fzinput_last', Fz_xyz[:,:,:,-1,:], 5)
+    print(int(Fz_xyz.shape[2]/2))
 
     logfile.write('now define conv1 \n')
     #1st conv layer: Convolve the input (Fz_xyz) with 16 different filters, don't do maxpooling!  
@@ -105,12 +108,14 @@ if __name__=='__main__':
     
     # Readout Layer
     with tf.name_scope('outputLayer'):
-        w_out = weight_variable([64, 5], 'wout')
-        b_out = bias_variable([81, 81, 5], 'bout')
+        w_out = weight_variable([64, 1], 'wout')
+        b_out = bias_variable([81, 81, 1], 'bout')
         outputLayer = tf.nn.relu(tf.add(tf.tensordot(fcLayer_1_dropout, w_out, axes=[[3],[0]]), b_out))
         tf.summary.histogram("weights", w_out)
         tf.summary.histogram("biases", b_out)
-        tf.summary.histogram("activations", outputLayer)        
+        tf.summary.histogram("activations", outputLayer)
+        tf.summary.image('predictions', outputLayer, 5)
+        
 
 #     set up evaluation system
 #     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
@@ -183,7 +188,10 @@ if __name__=='__main__':
         testaccuracy=accuracy.eval(feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0})
         logfile.write("test accuracy %g \n"%testaccuracy)
         
-        
+        solpics = outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0})
+
+
+
         # Save two np.arrays to be able to view it later.
         viewfile = h5py.File(parameters['viewPath'], 'w')
         viewfile.attrs['testaccuracy']=testaccuracy
