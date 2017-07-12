@@ -21,6 +21,8 @@ print('Parsing parameters from {}'.format(args.input_file))
 parameters = {'restorePath': None,                                                     # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
               'savePath': "../save/CNN_minimal_TR1_{}.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
               'DBPath': '../AFMDB_version_01.hdf5',
+              'DBShape': [81,81,41,1],
+              'outChannels': 1,
               'viewPath': '../scratch/viewfile_{}.hdf5'.format(args.name),
               'logPath': '../scratch/out_minimal_{}.log'.format(args.name),
               'trainstepsNumber': 1,
@@ -29,6 +31,10 @@ parameters = {'restorePath': None,                                              
               'logdir': '../save{}/'.format(args.name)}          
 
 LOGDIR = parameters['logdir']
+DBShape = parameters['DBShape']
+outChannels = parameters['outChannels']
+
+# Output has to have the same xy dimensions as input (DBShape)
 
 # Here smt like parameters.update(parsedParameters)
 
@@ -61,10 +67,10 @@ if __name__=='__main__':
 
 
     logfile.write('define the first two placeholders \n')
-    solution = tf.placeholder(tf.float32, [None, 81, 81, 1])
+    solution = tf.placeholder(tf.float32, [None,]+DBShape[:2]+[outChannels])
     tf.summary.image('solutions', solution, 5)
 
-    Fz_xyz = tf.placeholder(tf.float32, [None, 81, 81, 41, 1])
+    Fz_xyz = tf.placeholder(tf.float32, [None,]+DBShape)
     tf.summary.image('Fzinput_0', Fz_xyz[:,:,:,0,:], 5)
     tf.summary.image('Fzinput_half', Fz_xyz[:,:,:,int(Fz_xyz.shape[2]/2),:], 5)
     tf.summary.image('Fzinput_last', Fz_xyz[:,:,:,-1,:], 5)
@@ -73,7 +79,7 @@ if __name__=='__main__':
     logfile.write('now define conv1 \n')
     #1st conv layer: Convolve the input (Fz_xyz) with 16 different filters, don't do maxpooling!  
     with tf.name_scope('conv1'):
-        w_conv1 = weight_variable([4,4,4,1,16], 'wcv1')
+        w_conv1 = weight_variable([4,4,4,DBShape[-1],16], 'wcv1')
         b_conv1 = bias_variable([16], 'bcv1')
         convLayer_1 = tf.nn.tanh(tf.add(conv3d(Fz_xyz, w_conv1),b_conv1))
         tf.summary.histogram("weights", w_conv1)
@@ -93,9 +99,9 @@ if __name__=='__main__':
     logfile.write('all conv layers defined, defining fc layer \n')
     # fc 1   
     with tf.name_scope('fc'):
-        w_fc1 = weight_variable([41*32, 64], 'wfc1')
-        b_fc1 = bias_variable([81, 81, 64], 'bfc1')
-        convLayer_2_flat = tf.reshape(convLayer_2, [-1, 81, 81, 41*32])
+        w_fc1 = weight_variable([DBShape[-2]*32, 64], 'wfc1')
+        b_fc1 = bias_variable(DBShape[:2]+[64,], 'bfc1')
+        convLayer_2_flat = tf.reshape(convLayer_2, [-1,]+DBShape[:2]+ [DBShape[-2]*32])
         fcLayer_1 = tf.nn.relu(tf.tensordot(convLayer_2_flat, w_fc1,axes=[[3],[0]])+b_fc1)  #Is this correct? the result of the tensordot and the b_fc1 don't have the same dimensions
         tf.summary.histogram("weights", w_fc1)
         tf.summary.histogram("biases", b_fc1)
@@ -108,8 +114,8 @@ if __name__=='__main__':
     
     # Readout Layer
     with tf.name_scope('outputLayer'):
-        w_out = weight_variable([64, 1], 'wout')
-        b_out = bias_variable([81, 81, 1], 'bout')
+        w_out = weight_variable([64, outChannels], 'wout')
+        b_out = bias_variable(DBShape[:2]+[outChannels], 'bout')
         outputLayer = tf.nn.relu(tf.add(tf.tensordot(fcLayer_1_dropout, w_out, axes=[[3],[0]]), b_out))
         tf.summary.histogram("weights", w_out)
         tf.summary.histogram("biases", b_out)

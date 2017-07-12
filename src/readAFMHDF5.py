@@ -4,26 +4,37 @@ import h5py
 from math import exp
 from numpy import zeros, shape
 
+
 class AFMdata:
     """ Class for opening HDF5 file. """
-    def __init__(self, FileName):
-        """ Opens hdf5 file for reading. """
+    def __init__(self, FileName, shape=(81, 81, 41, 1)):
+        """ Opens hdf5 file FileName for reading. Shape has to contain the Shape of the DB, in the form (x,y,z,inChannels). """
         self.f = h5py.File(FileName, "r+")
+        self.shape = tuple(shape)
 
-    def batch(self, batchsize, shape=(81, 81, 41, 1)):
-        batch_Fz=np.zeros((batchsize,)+shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
-        batch_solutions=np.zeros((batchsize, shape[0], shape[1], shape[-1]))
+    def batch(self, batchsize, outputChannels=1):
+        """ Returns (training)batches as dictionaries with 'forces' and 'solutions' with arrays of shape
+        forces: (batchsize,)+shape
+        solutions: (batchsize,)+shape[:-2]+(outputChannels,)"""
+        
+        batch_Fz=np.zeros((batchsize,)+self.shape)
+        batch_solutions=np.zeros((batchsize,)+self.shape[:2]+(outputChannels,))
+        
         for i in range(0,batchsize):
             randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
             randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
             print 'Looking at file ' + randomorientation.name
 
-            batch_Fz[i]=randomorientation['fzvals'][...] #.reshape(shape)
-            batch_solutions[i]=np.sum(randomorientation['solution'][...], axis=-1, keepdims=True) #.reshape((shape[:-2]+(1,)))
+            batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
+            if outputChannels == 1:
+                batch_solutions[i]=np.sum(randomorientation['solution'][...], axis=-1, keepdims=True).reshape((self.shape[:-2]+(outputChannels,)))
+            else:
+                batch_solutions[i]=randomorientation['solution'][...].reshape((self.shape[:-2]+(outputChannels,)))
+
         return {'forces': batch_Fz, 'solutions': batch_solutions}
    
 
-    def solution_xymap_projection(self, datasetString):
+    def solution_xymap_projection(self, datasetString, COMposition=[0,0,0]):
         """Returns solution to train. Project the atom positions on the xy-plane with Amplitudes decaying like a Gaussian with the radius as variance. and write it on the correct level of the np-array.
         The last index of the array corresponds to the atom type:
         0 = C
@@ -42,7 +53,7 @@ class AFMdata:
         masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 'F' : 18.9984}
         covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}
         # Calculate Center Of Mass:
-        COM = np.zeros((3))
+        COM = np.array(COMposition)
         totalMass=0.0
         for i in range(len(atomNameString)):
             atomVector = atomPosition[i,:]
@@ -103,6 +114,7 @@ class AFMdata:
         return np.sum(self.solution_xymap_projection(dataSetString),axis=-1, keepdims=True)
 
     def solution_toyDB(self, orientationGroupString):
+        """ Adapted for the special case of the toyDB, that does not shift to the COM. """
         atomPos = self.f[orientationGroupString+'/atomPosition'][0,:]
         
         def atomSignal(evalvect, meanvect, atomNameString):
@@ -121,39 +133,43 @@ class AFMdata:
                 
         return solutionArray
 
-    def batch_fresh_solution(self, batchsize):
-        batch_Fz=np.zeros((batchsize,81,81,41,1))   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
-        batch_solutions=np.zeros((batchsize,81,81,5))
+    def batch_fresh_solution(self, batchsize, outputChannels=1):
+        """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. """
+        batch_Fz=np.zeros((batchsize,)+self.shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
+        batch_solutions=np.zeros((batchsize,)+self.shape[:-2]+(outputChannels,))
         for i in range(0,batchsize):
             randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
             randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
             print 'Looking at file ' + randomorientation.name
 
-            batch_Fz[i]=randomorientation['fzvals'][...]
+            batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
             batch_solutions[i]=self.solution_xymap_collapsed(randomorientation.name)[...]
         return {'forces': batch_Fz, 'solutions': batch_solutions}
     
-    def batch_test(self, batchsize, shape=(81,81,41,1)):
-        """ Returns a batch that includes the AtomPositions, s.t. a more comprehensible viewfile can be made. """
+    def batch_test(self, batchsize, outputChannels=1):
+        """ Returns a batch that includes the AtomPositions, so that a more comprehensible viewfile can be made. """
         
-        batch_Fz=np.zeros((batchsize,)+shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
-        batch_solutions=np.zeros((batchsize,)+shape[:-2]+(1,))
-        batch_atomPositions=np.zeros((batchsize,30,3))
+        batch_Fz=np.zeros((batchsize,)+self.shape)
+        batch_solutions=np.zeros((batchsize,)+self.shape[:2]+(outputChannels,))
+        batch_atomPositions=[]
         
         for i in range(0,batchsize):
             randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
             randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
             print 'Looking at file ' + randomorientation.name
 
-            batch_Fz[i]=randomorientation['fzvals'][...].reshape(shape)
-#             batch_solutions[i]=randomorientation['solution'][...].reshape((shape[:-2]+(1,)))
-            batch_atomPositions[i]=randomorientation['atomPosition'][...]
-            batch_solutions[i]=np.sum(randomorientation['solution'][...], axis=-1, keepdims=True) #.reshape((shape[:-2]+(1,)            
-        return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': batch_atomPositions}
+            batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
+            batch_atomPositions.append(randomorientation['atomPosition'][...])
+            
+            if outputChannels == 1:
+                batch_solutions[i]=np.sum(randomorientation['solution'][...], axis=-1, keepdims=True).reshape((self.shape[:-2]+(outputChannels,)))
+            else:
+                batch_solutions[i]=randomorientation['solution'][...].reshape((self.shape[:-2]+(outputChannels,)))        
+        return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': np.array(batch_atomPositions)}
     
     
 if __name__=='__main__':
     print 'Hallo Main'
-    datafile = AFMdata('/l/reischt1/toyDB_v05.hdf5')
-    print(datafile.batch_test(10, shape=(41,41,41,1)))
+    datafile = AFMdata('/l/reischt1/AFMDB_version_01.hdf5', shape=(81,81,41,1))
+    print(datafile.batch_test(10, outputChannels=5))
     
