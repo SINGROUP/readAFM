@@ -5,6 +5,7 @@ import numpy as np
 import time
 import argparse
 import h5py
+import utils
 
 
 parser = argparse.ArgumentParser()
@@ -18,6 +19,9 @@ args=parser.parse_args()
 print('Parsed name argument {} of type {}.'.format(args.name, type(args.name)))
 print('Parsing parameters from {}'.format(args.input_file))
 
+parsedParameters = utils.parseInputFile(args.input_file)
+
+# These are the default Parameters!
 parameters = {'restorePath': '../save01/CNN_minimal_TR1.ckpt-0',                                                # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
               'savePath': None,         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
 #               'savePath': "../save{}/CNN_minimal_TR1.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
@@ -30,7 +34,16 @@ parameters = {'restorePath': '../save01/CNN_minimal_TR1.ckpt-0',                
               'trainbatchSize':1,
               'testbatchSize': 1,
               'logdir': '../save{}/'.format(args.name),
-              'infoString': 'testrun_local_{}'.format(args.name)}
+              'infoString': 'minimalAFM_{}'.format(args.name),
+              'LearningRate': 0.001,
+              'useRuntimeSolution': False,
+              'RuntimeSol.method': 'xymap_collapsed', 
+              'RuntimeSol.COMposition': [0.,0.,0.], 
+              'RuntimeSol.sigmabase': 1.0, 
+              'RuntimeSol.amplificationFactor': 1.0
+              }
+
+parameters.update(parsedParameters)
 
 LOGDIR = parameters['logdir']
 DBShape = parameters['DBShape']
@@ -38,7 +51,6 @@ outChannels = parameters['outChannels']
 
 # Output has to have the same xy dimensions as input (DBShape)
 
-# Here smt like parameters.update(parsedParameters)
 
 
 def weight_variable(shape, name=None):
@@ -60,6 +72,15 @@ def bias_variable(shape, name=None):
 def conv3d(x, W):
     """ Short definition of the convolution function for 3d """
     return tf.nn.conv3d(x, W, strides=[1,1,1,1,1], padding='SAME')
+
+def make_viewfile(parameters, testaccuracy, predictions, labels, atomPosition):
+    viewfile = h5py.File(parameters['viewPath'], 'w')
+    viewfile.attrs['testaccuracy']=testaccuracy
+    viewfile.attrs['infoString']=parameters['infoString']
+    viewfile.create_dataset('predictions', data=predictions)
+    viewfile.create_dataset('solutions', data=labels)
+    viewfile.create_dataset('AtomPosition', data=atomPosition)
+    viewfile.close()
 
 def define_model(Fz_xyz, logfile):
 
@@ -117,16 +138,16 @@ def train_model(Fz_xyz, solution, keep_prob, logfile):
 #     set up evaluation system
 #     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
     with tf.name_scope('cost'):
-        cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))
+        cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize'])
         tf.summary.scalar('cost', cost)
 
     with tf.name_scope('accuracy'):
-        accuracy = cost
+        accuracy = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['testbatchSize'])
         tf.summary.scalar('accuracy',accuracy)
 #     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
     
     with tf.name_scope('train'):
-        train_step = tf.train.AdamOptimizer(0.001).minimize(cost)
+        train_step = tf.train.AdamOptimizer(parameters['LearningRate']).minimize(cost)
     
     # Crate saver
     saver = tf.train.Saver()
@@ -153,46 +174,58 @@ def train_model(Fz_xyz, solution, keep_prob, logfile):
 #             print(sess.run(b_conv1))
             logfile.write('Variables initialized successfully \n')
         
-        AFMdata = readAFM.AFMdata(parameters['DBPath'])
+        AFMdata = readAFM.AFMdata(parameters['DBPath'], shape=parameters['DBShape'])
     #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
         writer = tf.summary.FileWriter(LOGDIR+parameters['infoString'])
         writer.add_graph(sess.graph)        
         
         # Do stochastic training:
         for i in range(parameters['trainstepsNumber']):
-            try:
-                logfile.write('Starting Run #%i \n'%(i))
-                timestart=time.time()
-                batch = AFMdata.batch(parameters['trainbatchSize'])
-                logfile.write('read batch successfully \n')
-        
-                if i%100 == 0:
-                    [train_accuracy, s] = sess.run([accuracy, summ], feed_dict={Fz_xyz:batch['forces'], solution: batch['solutions'], keep_prob: 1.0})
-                    logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
-                    writer.add_summary(s, i)
-                    if parameters['savePath']:
-                        save_path=saver.save(sess, parameters['savePath'], i)
-                        logfile.write("Model saved in file: %s \n" % save_path)
+            logfile.write('Starting Run #%i \n'%(i))
+            timestart=time.time()
+            if parameters['useRuntimeSolution']:
+                batch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
+                                                      outputChannels=parameters['outChannels'], 
+                                                      method=parameters['RuntimeSol.method'],
+                                                      COMposition=parameters['RuntimeSol.COMposition'],
+                                                      sigmabase=parameters['RuntimeSol.sigmabase'],
+                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'])            
+            else:
+                batch = AFMdata.batch(parameters['trainbatchSize'], outputChannels=parameters['outChannels'])
 
-                train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
-                timeend=time.time()
-                logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
-            except IndexError:
-                print 'Index Error for this File'
-                logfile.write('Caught Index Error')
+                
+            logfile.write('read batch successfully \n')
+    
+            if i%100 == 0:
+                [train_accuracy, s] = sess.run([accuracy, summ], feed_dict={Fz_xyz:batch['forces'], solution: batch['solutions'], keep_prob: 1.0})
+                logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
+                writer.add_summary(s, i)
+                if parameters['savePath']:
+                    save_path=saver.save(sess, parameters['savePath'], i)
+                    logfile.write("Model saved in file: %s \n" % save_path)
+
+            train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
+            timeend=time.time()
+            logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
+
         
-        testbatch = AFMdata.batch_test(parameters['testbatchSize'])
+        
+        if parameters['useRuntimeSolution']:
+            testbatch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
+                                                      outputChannels=parameters['outChannels'], 
+                                                      method=parameters['RuntimeSol.method'],
+                                                      COMposition=parameters['RuntimeSol.COMposition'],
+                                                      sigmabase=parameters['RuntimeSol.sigmabase'],
+                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                                      returnAtomPositions=True)            
+        else:
+            testbatch = AFMdata.batch(parameters['testbatchSize'], outputChannels=parameters['outChannels'], returnAtomPositions=True)
+        
+        
         testaccuracy=accuracy.eval(feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0})
         logfile.write("test accuracy %g \n"%testaccuracy)
         
-        # Save two np.arrays to be able to view it later.
-        viewfile = h5py.File(parameters['viewPath'], 'w')
-        viewfile.attrs['testaccuracy']=testaccuracy
-        viewfile.attrs['infoString']=parameters['infoString']
-        viewfile.create_dataset('predictions', data=outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}))
-        viewfile.create_dataset('solutions', data=testbatch['solutions'])
-        viewfile.create_dataset('AtomPosition', data=testbatch['atomPosition'])
-        viewfile.close()
+        make_viewfile(parameters, testaccuracy, outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}), testbatch['solutions'], testbatch['atomPosition'])
         
     return 0
 
@@ -201,13 +234,8 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
     outputLayer = define_model(Fz_xyz, logfile)
     
 #     set up evaluation system
-#     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
-    with tf.name_scope('cost'):
-        cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))
-        tf.summary.scalar('cost', cost)
-
     with tf.name_scope('accuracy'):
-        accuracy = cost
+        accuracy = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['testbatchSize'])
         tf.summary.scalar('accuracy',accuracy)
 #     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
 
@@ -234,21 +262,26 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
         AFMdata = readAFM.AFMdata(parameters['DBPath'])
     #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
         writer = tf.summary.FileWriter(LOGDIR+parameters['infoString'])
-        writer.add_graph(sess.graph)        
-        testbatch = AFMdata.batch_test(parameters['testbatchSize'])
+        writer.add_graph(sess.graph)
+        
+        if parameters['useRuntimeSolution']:
+            testbatch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
+                                                      outputChannels=parameters['outChannels'], 
+                                                      method=parameters['RuntimeSol.method'],
+                                                      COMposition=parameters['RuntimeSol.COMposition'],
+                                                      sigmabase=parameters['RuntimeSol.sigmabase'],
+                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                                      returnAtomPositions=True)            
+        else:
+            testbatch = AFMdata.batch(parameters['testbatchSize'], outputChannels=parameters['outChannels'], returnAtomPositions=True)
+        
         [testaccuracy, s] = sess.run([accuracy, summ],feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0})     
 
         logfile.write("test accuracy %g \n"%testaccuracy)
         writer.add_summary(s)
         
         # Save two np.arrays to be able to view it later.
-        viewfile = h5py.File(parameters['viewPath'], 'w')
-        viewfile.attrs['testaccuracy']=testaccuracy
-        viewfile.attrs['infoString']=parameters['infoString']
-        viewfile.create_dataset('predictions', data=outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}))
-        viewfile.create_dataset('solutions', data=testbatch['solutions'])
-        viewfile.create_dataset('AtomPosition', data=testbatch['atomPosition'])
-        viewfile.close()
+        make_viewfile(parameters, testaccuracy, outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}), testbatch['solutions'], testbatch['atomPosition'])
         
     return 0
 
@@ -270,8 +303,8 @@ if __name__=='__main__':
 
     keep_prob = tf.placeholder(tf.float32)
 
-#     train_model(Fz_xyz, solution, keep_prob, logfile)
-    eval_model(Fz_xyz, solution, keep_prob, logfile)
+    train_model(Fz_xyz, solution, keep_prob, logfile)
+#     eval_model(Fz_xyz, solution, keep_prob, logfile)
 
         
     logfile.write('finished! \n')

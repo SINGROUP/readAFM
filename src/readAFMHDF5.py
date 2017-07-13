@@ -2,8 +2,20 @@ import numpy as np
 import random
 import h5py
 from math import exp
-from numpy import zeros, shape
+import numpy as np
+import time
 
+def atomSignal(evalvect, meanvect, atomNameString, sigmabase=1.0):
+    """ This is not a Normal Distribution!!! It's a gauss-like distribution, 
+    but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), 
+    this is s.t. the different elements give different 'signals'. 
+    Sigmabase is multiplied with the relative covalent ratius, with C corresponding to 1.
+    I think it can be interpreted as a length in A.
+    """
+    covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
+    sigma = sigmabase*(covalentRadii[atomNameString])/76
+    normalisation = 1.0*(covalentRadii[atomNameString])/76.
+    return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
 
 class AFMdata:
     """ Class for opening HDF5 file. """
@@ -11,30 +23,9 @@ class AFMdata:
         """ Opens hdf5 file FileName for reading. Shape has to contain the Shape of the DB, in the form (x,y,z,inChannels). """
         self.f = h5py.File(FileName, "r+")
         self.shape = tuple(shape)
+ 
 
-    def batch(self, batchsize, outputChannels=1):
-        """ Returns (training)batches as dictionaries with 'forces' and 'solutions' with arrays of shape
-        forces: (batchsize,)+shape
-        solutions: (batchsize,)+shape[:-2]+(outputChannels,)"""
-        
-        batch_Fz=np.zeros((batchsize,)+self.shape)
-        batch_solutions=np.zeros((batchsize,)+self.shape[:2]+(outputChannels,))
-        
-        for i in range(0,batchsize):
-            randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
-            randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
-            print 'Looking at file ' + randomorientation.name
-
-            batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
-            if outputChannels == 1:
-                batch_solutions[i]=np.sum(randomorientation['solution'][...], axis=-1, keepdims=True).reshape((self.shape[:-2]+(outputChannels,)))
-            else:
-                batch_solutions[i]=randomorientation['solution'][...].reshape((self.shape[:-2]+(outputChannels,)))
-
-        return {'forces': batch_Fz, 'solutions': batch_solutions}
-   
-
-    def solution_xymap_projection(self, datasetString, COMposition=[0,0,0]):
+    def solution_xymap_projection(self, datasetString, COMposition=[0.,0.,0.], sigmabase=1.0, amplificationFactor=1.0):
         """Returns solution to train. Project the atom positions on the xy-plane with Amplitudes decaying like a Gaussian with the radius as variance. and write it on the correct level of the np-array.
         The last index of the array corresponds to the atom type:
         0 = C
@@ -74,15 +65,7 @@ class AFMdata:
     
         matrixPositionZIndex = int(round((atomPosition[indexOf_max_Zposition_in_atomNameString,2]-COM[2]+10)/self.f[datasetString].attrs['dxyz'][2]))
     
-        def atomSignal(evalvect, meanvect, atomNameString):
-            """ This is not a Normal Distribution!!! It's a gauss-like distribution, but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), this is s.t. the different elements give different 'signals'. """
-            # Lets try it without Normalisation
-    #             return 1/sqrt(2*pi*sigma**2)*exp(-((x-xmen)**2+(y-ymean)**2+(z-zmean)**2)/sigma**2)
-            sigma = 4.0*(covalentRadii[atomNameString[i]])/76   # This i should not be here, am I right???
-            normalisation = 1.0*(covalentRadii[atomNameString[i]])/76.
-    #             normalisation = 1.0
-            return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
-    
+
         for i in range(len(atomNameString)):
             xPos = atomPosition[i,0]-COM[0]+(widthX/2.)
             yPos = atomPosition[i,1]-COM[1]+(widthY/2.)
@@ -102,56 +85,78 @@ class AFMdata:
             #find gaussianDistribution.pdf() at each point on the XY matrix at height 140 and add to the matrix of that type of atom
             for yIndexIter in range(self.f[datasetString].attrs['divxyz'][1]):
                 for xIndexIter in range(self.f[datasetString].attrs['divxyz'][0]):
-                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += atomSignal([xIndexIter, yIndexIter, matrixPositionZIndex], [xPosInt, yPosInt, zPosInt], atomNameString)
+                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += atomSignal([xIndexIter, yIndexIter, matrixPositionZIndex], [xPosInt, yPosInt, zPosInt], atomNameString[i], sigmabase)
     
-        projected_array = projected_array * 10
+        projected_array = projected_array * amplificationFactor
         
         return projected_array
     
         
-    def solution_xymap_collapsed(self, dataSetString):
+    def solution_xymap_collapsed(self, dataSetString, COMposition=[0.,0.,0.], sigmabase=1.0, amplificationFactor=1.0):
         """Gives a version of the xymap solution collapsed to only one map, asking the question 'atom or not?' instead of 'What kind of atom?' """
-        return np.sum(self.solution_xymap_projection(dataSetString),axis=-1, keepdims=True)
+        return np.sum(self.solution_xymap_projection(dataSetString, COMposition, sigmabase, amplificationFactor),axis=-1, keepdims=True)
 
-    def solution_toyDB(self, orientationGroupString):
+    def solution_singleAtom(self, orientationGroupString, sigmabase=1.0, amplificationFactor=1.0):
         """ Adapted for the special case of the toyDB, that does not shift to the COM. """
         atomPos = self.f[orientationGroupString+'/atomPosition'][0,:]
-        
-        def atomSignal(evalvect, meanvect, atomNameString):
-            """ This is not a Normal Distribution!!! It's a gauss-like distribution, 
-            but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), 
-            this is s.t. the different elements give different 'signals'. """
-            covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
-            sigma = 1.0*(covalentRadii[atomNameString])/76
-            normalisation = 1.0*(covalentRadii[atomNameString])/76.
-            return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
-        
+                
         solutionArray = np.zeros((41,41,1))
         for xindex in range(41):
             for yindex in range(41):
-                solutionArray[xindex, yindex, 0]+=atomSignal([float(xindex)*0.2,float(yindex)*0.2,0.0*0.2], atomPos, 'C')
+                solutionArray[xindex, yindex, 0]+=atomSignal([float(xindex)*0.2,float(yindex)*0.2,0.0*0.2], atomPos, 'C', sigmabase)
+        
+        solutionArray = solutionArray*amplificationFactor
                 
         return solutionArray
 
-    def batch_fresh_solution(self, batchsize, outputChannels=1):
-        """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. """
+    def batch_runtimeSolution(self, 
+                              batchsize, 
+                              outputChannels=1, 
+                              method='xymap_collapsed', 
+                              COMposition=[0.,0.,0.], 
+                              sigmabase=1.0, 
+                              amplificationFactor=1.0, 
+                              returnAtomPositions=False):
+        """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. 
+        Output channels has to match the method.
+        Methods are: xymap_collapsed, xymap_projection, singleAtom
+        """
         batch_Fz=np.zeros((batchsize,)+self.shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
         batch_solutions=np.zeros((batchsize,)+self.shape[:-2]+(outputChannels,))
+        if returnAtomPositions:
+            batch_atomPositions=[]
+            
         for i in range(0,batchsize):
             randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
             randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
             print 'Looking at file ' + randomorientation.name
 
             batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
-            batch_solutions[i]=self.solution_xymap_collapsed(randomorientation.name)[...]
-        return {'forces': batch_Fz, 'solutions': batch_solutions}
+            if method=='xymap_collapsed':
+                batch_solutions[i]=self.solution_xymap_collapsed(randomorientation.name, COMposition, sigmabase, amplificationFactor)[...]
+            elif method=='xymap_projection':
+                batch_solutions[i]=self.solution_xymap_projection(randomorientation.name, COMposition, sigmabase, amplificationFactor)[...]
+            elif method=='singleAtom':
+                batch_solutions[i]=self.solution_singleAtom(randomorientation.name, sigmabase, amplificationFactor)[...]
+                
+            if returnAtomPositions:
+                batch_atomPositions.append(randomorientation['atomPosition'][...])
+                
+        if returnAtomPositions:
+            return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': np.array(batch_atomPositions)}
+        else:
+            return {'forces': batch_Fz, 'solutions': batch_solutions}
     
-    def batch_test(self, batchsize, outputChannels=1):
-        """ Returns a batch that includes the AtomPositions, so that a more comprehensible viewfile can be made. """
+    def batch(self, batchsize, outputChannels=1, returnAtomPositions=False):
+        """ Returns (training)batches as dictionaries with 'forces' and 'solutions' with arrays of shape
+        forces: (batchsize,)+shape
+        solutions: (batchsize,)+shape[:-2]+(outputChannels,)"""
         
         batch_Fz=np.zeros((batchsize,)+self.shape)
         batch_solutions=np.zeros((batchsize,)+self.shape[:2]+(outputChannels,))
-        batch_atomPositions=[]
+        
+        if returnAtomPositions:
+            batch_atomPositions=[]
         
         for i in range(0,batchsize):
             randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
@@ -159,17 +164,67 @@ class AFMdata:
             print 'Looking at file ' + randomorientation.name
 
             batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
-            batch_atomPositions.append(randomorientation['atomPosition'][...])
-            
             if outputChannels == 1:
                 batch_solutions[i]=np.sum(randomorientation['solution'][...], axis=-1, keepdims=True).reshape((self.shape[:-2]+(outputChannels,)))
             else:
-                batch_solutions[i]=randomorientation['solution'][...].reshape((self.shape[:-2]+(outputChannels,)))        
-        return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': np.array(batch_atomPositions)}
-    
-    
+                batch_solutions[i]=randomorientation['solution'][...].reshape((self.shape[:-2]+(outputChannels,)))
+
+            if returnAtomPositions:
+                batch_atomPositions.append(randomorientation['atomPosition'][...])
+
+        if returnAtomPositions:
+            return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': np.array(batch_atomPositions)}
+        else:
+            return {'forces': batch_Fz, 'solutions': batch_solutions}    
+        
+    def add_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabase=1.0, amplificationFactor=1.0):
+        
+        for molstr in self.f.keys():
+            timestart=time.time()
+            molecule = self.f[molstr]
+            print(molstr)
+            for ortnstr in molecule.keys():
+                orientation=molecule[ortnstr]
+                
+                if method=='xymap_collapsed':
+                    orientation.create_dataset('solution', data=self.solution_xymap_collapsed(orientation.name, COMposition, sigmabase, amplificationFactor)[...])
+                elif method=='xymap_projection':
+                    orientation.create_dataset('solution', data=self.solution_xymap_projection(orientation.name, COMposition, sigmabase, amplificationFactor)[...])
+                elif method=='singleAtom':
+                    orientation.create_dataset('solution', data=self.solution_singleAtom(orientation.name, sigmabase, amplificationFactor)[...])
+
+                print(ortnstr, orientation.name)
+                
+            timeend=time.time()
+            print("This molecule took %f seconds to label."%(timeend-timestart))
+            
+            
+    def change_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabase=1.0, amplificationFactor=1.0):
+        """Options for method: 'xymap_collapsed', 'xymap_projection', 'singleAtom'
+        """
+        for molstr in self.f.keys():
+            timestart=time.time()
+            molecule = self.f[molstr]
+            print(molstr)
+            for ortnstr in molecule.keys():
+                orientation=molecule[ortnstr]
+                
+                if method=='xymap_collapsed':
+                    orientation['solution'][...]=self.solution_xymap_collapsed(orientation.name, COMposition, sigmabase, amplificationFactor)[...]
+                elif method=='xymap_projection':
+                    orientation['solution'][...]=self.solution_xymap_projection(orientation.name, COMposition, sigmabase, amplificationFactor)[...]
+                elif method=='singleAtom':
+                    orientation['solution'][...]=self.solution_singleAtom(orientation.name, sigmabase, amplificationFactor)[...]
+
+                print(ortnstr, orientation.name)
+                
+            timeend=time.time()
+            print("This molecule took %f seconds to relabel."%(timeend-timestart))
+                
+
+        
 if __name__=='__main__':
     print 'Hallo Main'
-    datafile = AFMdata('/l/reischt1/AFMDB_version_01.hdf5', shape=(81,81,41,1))
-    print(datafile.batch_test(10, outputChannels=5))
+    datafile = AFMdata('/l/reischt1/toyDB_v09_oneAtomShifted.hdf5', shape=(41,41,41,1))
+    datafile.change_labels('singleAtom', COMposition=[0.01, 0.01, 0.0], sigmabase=1.0, amplificationFactor=1.0)
     
