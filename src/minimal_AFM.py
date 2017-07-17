@@ -6,6 +6,8 @@ import time
 import argparse
 import h5py
 import utils
+import os
+import errno
 
 
 parser = argparse.ArgumentParser()
@@ -29,12 +31,12 @@ parameters = {'train': True,
               'DBPath': '../AFMDB_version_01.hdf5',
               'DBShape': [81,81,41,1],
               'outChannels': 1,
+              'logdir': './save{}/'.format(args.name),
               'viewPath': './viewfile_{}.hdf5'.format(args.name),
               'logPath': './out_minimal_{}.log'.format(args.name),
               'trainstepsNumber': 1,
               'trainbatchSize':1,
               'testbatchSize': 1,
-              'logdir': './save{}/'.format(args.name),
               'infoString': 'minimalAFM_{}'.format(args.name),
               'LearningRate': 0.001,
               'useRuntimeSolution': False,
@@ -178,7 +180,7 @@ def train_model(Fz_xyz, solution, keep_prob, logfile):
         
         AFMdata = readAFM.AFMdata(parameters['DBPath'], shape=parameters['DBShape'])
     #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
-        writer = tf.summary.FileWriter(LOGDIR+parameters['infoString'])
+        writer = tf.summary.FileWriter(LOGDIR)
         writer.add_graph(sess.graph)        
         
         # Do stochastic training:
@@ -265,7 +267,7 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
         
         AFMdata = readAFM.AFMdata(parameters['DBPath'], shape=parameters['DBShape'])
     #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
-        writer = tf.summary.FileWriter(LOGDIR+parameters['infoString'])
+        writer = tf.summary.FileWriter(LOGDIR)
         writer.add_graph(sess.graph)
         
         if parameters['useRuntimeSolution']:
@@ -294,6 +296,14 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
 
 if __name__=='__main__':
 
+    if not os.path.exists(os.path.dirname(parameters['logPath'])):
+        try:
+            os.makedirs(os.path.dirname(parameters['logPath']))
+        except OSError as exc: # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
+    
+    
     logfile=open(parameters['logPath'], 'w', 0)
 
     logfile.write('define the  placeholders \n')
