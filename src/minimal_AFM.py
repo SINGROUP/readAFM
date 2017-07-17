@@ -22,18 +22,18 @@ print('Parsing parameters from {}'.format(args.input_file))
 parsedParameters = utils.parseInputFile(args.input_file)
 
 # These are the default Parameters!
-parameters = {'restorePath': '../save01/CNN_minimal_TR1.ckpt-0',                                                # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
+parameters = {'restorePath': None,                                                # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
               'savePath': None,         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
 #               'savePath': "../save{}/CNN_minimal_TR1.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
               'DBPath': '../AFMDB_version_01.hdf5',
               'DBShape': [81,81,41,1],
               'outChannels': 1,
-              'viewPath': '../scratch/viewfile_{}.hdf5'.format(args.name),
-              'logPath': '../scratch/out_minimal_{}.log'.format(args.name),
+              'viewPath': './viewfile_{}.hdf5'.format(args.name),
+              'logPath': './out_minimal_{}.log'.format(args.name),
               'trainstepsNumber': 1,
               'trainbatchSize':1,
               'testbatchSize': 1,
-              'logdir': '../save{}/'.format(args.name),
+              'logdir': './save{}/'.format(args.name),
               'infoString': 'minimalAFM_{}'.format(args.name),
               'LearningRate': 0.001,
               'useRuntimeSolution': False,
