@@ -120,7 +120,8 @@ class AFMdata:
                               outputChannels=1, 
                               method='xymap_collapsed', 
                               COMposition=[0.,0.,0.], 
-                              sigmabase=1.0, 
+                              sigmabasexy=1.0,
+                              sigmabasez=1.0, 
                               amplificationFactor=1.0, 
                               returnAtomPositions=False):
         """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. 
@@ -139,11 +140,11 @@ class AFMdata:
 
             batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
             if method=='xymap_collapsed':
-                batch_solutions[i]=self.solution_xymap_collapsed(randomorientation.name, COMposition, sigmabase, amplificationFactor)[...]
+                batch_solutions[i]=self.solution_xymap_collapsed(randomorientation.name, COMposition, sigmabasexy, sigmabasez, amplificationFactor)[...]
             elif method=='xymap_projection':
-                batch_solutions[i]=self.solution_xymap_projection(randomorientation.name, COMposition, sigmabase, amplificationFactor)[...]
+                batch_solutions[i]=self.solution_xymap_projection(randomorientation.name, COMposition, sigmabasexy, sigmabasez, amplificationFactor)[...]
             elif method=='singleAtom':
-                batch_solutions[i]=self.solution_singleAtom(randomorientation.name, sigmabase, amplificationFactor)[...]
+                batch_solutions[i]=self.solution_singleAtom(randomorientation.name, sigmabasexy, sigmabasez, amplificationFactor)[...]
                 
             if returnAtomPositions:
                 batch_atomPositions.append(randomorientation['atomPosition'][...])
@@ -183,7 +184,7 @@ class AFMdata:
         else:
             return {'forces': batch_Fz, 'solutions': batch_solutions}    
         
-    def add_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabase=1.0, amplificationFactor=1.0):
+    def add_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
         
         for molstr in self.f.keys():
             timestart=time.time()
@@ -193,11 +194,11 @@ class AFMdata:
                 orientation=molecule[ortnstr]
                 
                 if method=='xymap_collapsed':
-                    orientation.create_dataset('solution', data=self.solution_xymap_collapsed(orientation.name, COMposition, sigmabase, amplificationFactor)[...])
+                    orientation.create_dataset('solution', data=self.solution_xymap_collapsed(orientation.name, COMposition, sigmabasexy, sigmabasez, amplificationFactor)[...])
                 elif method=='xymap_projection':
-                    orientation.create_dataset('solution', data=self.solution_xymap_projection(orientation.name, COMposition, sigmabase, amplificationFactor)[...])
+                    orientation.create_dataset('solution', data=self.solution_xymap_projection(orientation.name, COMposition, sigmabasexy, sigmabasez, amplificationFactor)[...])
                 elif method=='singleAtom':
-                    orientation.create_dataset('solution', data=self.solution_singleAtom(orientation.name, sigmabase, amplificationFactor)[...])
+                    orientation.create_dataset('solution', data=self.solution_singleAtom(orientation.name, sigmabasexy, sigmabasez, amplificationFactor)[...])
 
                 print(ortnstr, orientation.name)
                 
@@ -205,7 +206,7 @@ class AFMdata:
             print("This molecule took %f seconds to label."%(timeend-timestart))
             
             
-    def change_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabase=1.0, amplificationFactor=1.0):
+    def change_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
         """Options for method: 'xymap_collapsed', 'xymap_projection', 'singleAtom'
         """
         for molstr in self.f.keys():
@@ -216,11 +217,11 @@ class AFMdata:
                 orientation=molecule[ortnstr]
                 
                 if method=='xymap_collapsed':
-                    orientation['solution'][...]=self.solution_xymap_collapsed(orientation.name, COMposition, sigmabase, amplificationFactor)[...]
+                    orientation['solution'][...]=self.solution_xymap_collapsed(orientation.name, COMposition, sigmabasexy, sigmabasez, amplificationFactor)[...]
                 elif method=='xymap_projection':
-                    orientation['solution'][...]=self.solution_xymap_projection(orientation.name, COMposition, sigmabase, amplificationFactor)[...]
+                    orientation['solution'][...]=self.solution_xymap_projection(orientation.name, COMposition, sigmabasexy, sigmabasez, amplificationFactor)[...]
                 elif method=='singleAtom':
-                    orientation['solution'][...]=self.solution_singleAtom(orientation.name, sigmabase, amplificationFactor)[...]
+                    orientation['solution'][...]=self.solution_singleAtom(orientation.name, sigmabasexy, sigmabasez, amplificationFactor)[...]
 
                 print(ortnstr, orientation.name)
                 
