@@ -28,6 +28,8 @@ def parseInputFile(inputFile):
                 parameter[key.strip()] = [float(item) for item in v.strip('[]').split(',')]
         elif v == 'None':
             parameter[key.strip()] = None
+        elif v == 'False':
+            parameter[key.strip()] = False
         elif v == 'True':
             parameter[key.strip()] = True
         else:

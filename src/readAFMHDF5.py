@@ -5,7 +5,7 @@ from math import exp
 import numpy as np
 import time
 
-def atomSignal(evalvect, meanvect, atomNameString, sigmabase=1.0):
+def atomSignal(evalvect, meanvect, atomNameString, sigmabasexy=1.0, sigmabasez=1.0, amplification=1.0):
     """ This is not a Normal Distribution!!! It's a gauss-like distribution, 
     but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), 
     this is s.t. the different elements give different 'signals'. 
@@ -13,9 +13,9 @@ def atomSignal(evalvect, meanvect, atomNameString, sigmabase=1.0):
     I think it can be interpreted as a length in A.
     """
     covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
-    sigma = sigmabase*(covalentRadii[atomNameString])/76
-    normalisation = 1.0*(covalentRadii[atomNameString])/76.
-    return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2+(evalvect[2]-meanvect[2])**2)/sigma**2)
+    [sigmabasexy, sigmabasez] = [sigmabasexy, sigmabasez]*((covalentRadii[atomNameString])/76)
+    normalisation = amplification*(covalentRadii[atomNameString])/76.
+    return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2)/sigmabasexy**2+((evalvect[2]-meanvect[2])**2)/sigmabasez**2)
 
 class AFMdata:
     """ Class for opening HDF5 file. """
@@ -25,7 +25,7 @@ class AFMdata:
         self.shape = tuple(shape)
  
 
-    def solution_xymap_projection(self, datasetString, COMposition=[0.,0.,0.], sigmabase=1.0, amplificationFactor=1.0):
+    def solution_xymap_projection(self, datasetString, COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
         """Returns solution to train. Project the atom positions on the xy-plane with Amplitudes decaying like a Gaussian with the radius as variance. and write it on the correct level of the np-array.
         The last index of the array corresponds to the atom type:
         0 = C
@@ -85,28 +85,34 @@ class AFMdata:
             #find gaussianDistribution.pdf() at each point on the XY matrix at height 140 and add to the matrix of that type of atom
             for yIndexIter in range(self.f[datasetString].attrs['divxyz'][1]):
                 for xIndexIter in range(self.f[datasetString].attrs['divxyz'][0]):
-                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += atomSignal([xIndexIter, yIndexIter, matrixPositionZIndex], [xPosInt, yPosInt, zPosInt], atomNameString[i], sigmabase)
-    
-        projected_array = projected_array * amplificationFactor
+                    projected_array[xIndexIter, yIndexIter, selectedAtomGridIndex] += atomSignal([xIndexIter, yIndexIter, matrixPositionZIndex], 
+                                                                                                 [xPosInt, yPosInt, zPosInt], 
+                                                                                                 atomNameString[i], 
+                                                                                                 sigmabasexy=sigmabasexy,
+                                                                                                 sigmabasez=sigmabasez, 
+                                                                                                 amplification=amplificationFactor)
         
         return projected_array
     
         
-    def solution_xymap_collapsed(self, dataSetString, COMposition=[0.,0.,0.], sigmabase=1.0, amplificationFactor=1.0):
+    def solution_xymap_collapsed(self, dataSetString, COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
         """Gives a version of the xymap solution collapsed to only one map, asking the question 'atom or not?' instead of 'What kind of atom?' """
-        return np.sum(self.solution_xymap_projection(dataSetString, COMposition, sigmabase, amplificationFactor),axis=-1, keepdims=True)
+        return np.sum(self.solution_xymap_projection(dataSetString, COMposition, sigmabasexy, sigmabasez, amplificationFactor),axis=-1, keepdims=True)
 
-    def solution_singleAtom(self, orientationGroupString, sigmabase=1.0, amplificationFactor=1.0):
+    def solution_singleAtom(self, orientationGroupString, sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
         """ Adapted for the special case of the toyDB, that does not shift to the COM. """
         atomPos = self.f[orientationGroupString+'/atomPosition'][0,:]
                 
         solutionArray = np.zeros((41,41,1))
         for xindex in range(41):
             for yindex in range(41):
-                solutionArray[xindex, yindex, 0]+=atomSignal([float(xindex)*0.2,float(yindex)*0.2,0.0*0.2], atomPos, 'C', sigmabase)
-        
-        solutionArray = solutionArray*amplificationFactor
-                
+                solutionArray[xindex, yindex, 0]+=atomSignal([float(xindex)*0.2,float(yindex)*0.2,0.0*0.2], 
+                                                             atomPos, 
+                                                             atomNameString='C', 
+                                                             sigmabasexy=sigmabasexy, 
+                                                             sigmabasez=sigmabasez, 
+                                                             amplification=amplificationFactor)
+                     
         return solutionArray
 
     def batch_runtimeSolution(self, 
@@ -226,5 +232,5 @@ class AFMdata:
 if __name__=='__main__':
     print 'Hallo Main'
     datafile = AFMdata('/l/reischt1/toyDB_v09_oneAtomShifted.hdf5', shape=(41,41,41,1))
-    datafile.change_labels('singleAtom', COMposition=[0.01, 0.01, 0.0], sigmabase=1.0, amplificationFactor=1.0)
+    print(datafile.solution_xymap_collapsed('molecule1/orientation1'))
     

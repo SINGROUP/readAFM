@@ -40,7 +40,8 @@ parameters = {'train': True,
               'useRuntimeSolution': False,
               'RuntimeSol.method': 'xymap_collapsed', 
               'RuntimeSol.COMposition': [0.,0.,0.], 
-              'RuntimeSol.sigmabase': 1.0, 
+              'RuntimeSol.sigmabasexy': 1.0,
+              'RUntimeSol.sigmabasez': 1.0, 
               'RuntimeSol.amplificationFactor': 1.0
               }
 
@@ -189,7 +190,8 @@ def train_model(Fz_xyz, solution, keep_prob, logfile):
                                                       outputChannels=parameters['outChannels'], 
                                                       method=parameters['RuntimeSol.method'],
                                                       COMposition=parameters['RuntimeSol.COMposition'],
-                                                      sigmabase=parameters['RuntimeSol.sigmabase'],
+                                                      sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
+                                                      sigmabasez=parameters['RuntimeSol.sigmabasez'],
                                                       amplificationFactor=parameters['RuntimeSol.amplificationFactor'])            
             else:
                 batch = AFMdata.batch(parameters['trainbatchSize'], outputChannels=parameters['outChannels'])
@@ -216,7 +218,8 @@ def train_model(Fz_xyz, solution, keep_prob, logfile):
                                                       outputChannels=parameters['outChannels'], 
                                                       method=parameters['RuntimeSol.method'],
                                                       COMposition=parameters['RuntimeSol.COMposition'],
-                                                      sigmabase=parameters['RuntimeSol.sigmabase'],
+                                                      sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
+                                                      sigmabasez=parameters['RuntimeSol.sigmabasez'],
                                                       amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
                                                       returnAtomPositions=True)            
         else:
@@ -270,7 +273,8 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
                                                       outputChannels=parameters['outChannels'], 
                                                       method=parameters['RuntimeSol.method'],
                                                       COMposition=parameters['RuntimeSol.COMposition'],
-                                                      sigmabase=parameters['RuntimeSol.sigmabase'],
+                                                      sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
+                                                      sigmabasez=parameters['RuntimeSol.sigmabasez'],
                                                       amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
                                                       returnAtomPositions=True)            
         else:
