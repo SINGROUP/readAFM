@@ -260,7 +260,7 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
             print("Model restored.")
             logfile.write('Variables initialized successfully \n')
         
-        AFMdata = readAFM.AFMdata(parameters['DBPath'])
+        AFMdata = readAFM.AFMdata(parameters['DBPath'], shape=parameters['DBShape'])
     #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
         writer = tf.summary.FileWriter(LOGDIR+parameters['infoString'])
         writer.add_graph(sess.graph)
@@ -282,7 +282,7 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
         writer.add_summary(s)
         
         # Save two np.arrays to be able to view it later.
-        make_viewfile(parameters, testaccuracy, outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}), testbatch['solutions'], testbatch['atomPosition'])
+        # make_viewfile(parameters, testaccuracy, outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}), testbatch['solutions'], testbatch['atomPosition'])
         
     return 0
 
@@ -303,9 +303,15 @@ if __name__=='__main__':
     tf.summary.image('solutions', solution, 5)
 
     keep_prob = tf.placeholder(tf.float32)
+    
+    print(parameters['train'])
 
-    train_model(Fz_xyz, solution, keep_prob, logfile)
-#     eval_model(Fz_xyz, solution, keep_prob, logfile)
+    if parameters['train']:
+        print('Start training:')
+        train_model(Fz_xyz, solution, keep_prob, logfile)
+    else:
+        print('Start evaluation:')
+        eval_model(Fz_xyz, solution, keep_prob, logfile)
 
         
     logfile.write('finished! \n')
