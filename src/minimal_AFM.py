@@ -22,7 +22,8 @@ print('Parsing parameters from {}'.format(args.input_file))
 parsedParameters = utils.parseInputFile(args.input_file)
 
 # These are the default Parameters!
-parameters = {'restorePath': None,                                                # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
+parameters = {'train': True,
+              'restorePath': None,                                                # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
               'savePath': None,         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
 #               'savePath': "../save{}/CNN_minimal_TR1.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
               'DBPath': '../AFMDB_version_01.hdf5',
