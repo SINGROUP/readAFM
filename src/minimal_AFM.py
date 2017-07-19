@@ -80,7 +80,8 @@ def conv3d(x, W):
 def make_viewfile(parameters, testaccuracy, predictions, labels, atomPosition):
     viewfile = h5py.File(parameters['viewPath'], 'w')
     viewfile.attrs['testaccuracy']=testaccuracy
-    viewfile.attrs['infoString']=parameters['infoString']
+    for key in parameters.keys():
+        viewfile.attrs[key]=parameters[key]
     viewfile.create_dataset('predictions', data=predictions)
     viewfile.create_dataset('solutions', data=labels)
     viewfile.create_dataset('AtomPosition', data=atomPosition)
