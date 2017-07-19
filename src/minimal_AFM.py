@@ -5,9 +5,7 @@ import numpy as np
 import time
 import argparse
 import h5py
-import utils
-import os
-import errno
+from utils import * 
 
 
 parser = argparse.ArgumentParser()
@@ -21,7 +19,7 @@ args=parser.parse_args()
 print('Parsed name argument {} of type {}.'.format(args.name, type(args.name)))
 print('Parsing parameters from {}'.format(args.input_file))
 
-parsedParameters = utils.parseInputFile(args.input_file)
+parsedParameters = parseInputFile(args.input_file)
 
 # These are the default Parameters!
 parameters = {'train': True,
@@ -39,6 +37,7 @@ parameters = {'train': True,
               'testbatchSize': 1,
               'infoString': 'minimalAFM_{}'.format(args.name),
               'LearningRate': 0.001,
+              'costWeight': 1.0,
               'useRuntimeSolution': False,
               'RuntimeSol.method': 'xymap_collapsed', 
               'RuntimeSol.COMposition': [0.,0.,0.], 
@@ -141,11 +140,11 @@ def train_model(Fz_xyz, solution, keep_prob, logfile):
     outputLayer = define_model(Fz_xyz, logfile)
     
 #     set up evaluation system
-#     cost = tf.reduce_mean(tf.abs(tf.subtract(prediction, solution)))
     with tf.name_scope('cost'):
-        cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize'])
+        # cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize']) 
+        cost = (1.- parameters['costWeight'])*tf.reduce_sum(tf.multiply(tf.square(tf.subtract(outputLayer, solution)), solution))/float(parameters['trainbatchSize']) + parameters['costWeight']*tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize'])
         tf.summary.scalar('cost', cost)
-
+        
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['testbatchSize'])
         tf.summary.scalar('accuracy',accuracy)
@@ -296,16 +295,9 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
 
 
 if __name__=='__main__':
-
-    if not os.path.exists(os.path.dirname(parameters['logPath'])):
-        try:
-            os.makedirs(os.path.dirname(parameters['logPath']))
-        except OSError as exc: # Guard against race condition
-            if exc.errno != errno.EEXIST:
-                raise
     
     
-    logfile=open(parameters['logPath'], 'w', 0)
+    logfile=safe_open_w(parameters['logPath'], 'w', 0)
 
     logfile.write('define the  placeholders \n')
     Fz_xyz = tf.placeholder(tf.float32, [None,]+DBShape)
