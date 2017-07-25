@@ -15,7 +15,7 @@ def atomSignal(evalvect, meanvect, atomNameString, sigmabasexy=1.0, sigmabasez=1
     covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
     [sigmabasexy, sigmabasez] = [sigmabasexy, sigmabasez]*((covalentRadii[atomNameString])/76)
     normalisation = amplification*(covalentRadii[atomNameString])/76.
-    return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2)/sigmabasexy**2+((evalvect[2]-meanvect[2])**2)/sigmabasez**2)
+    return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2)/sigmabasexy**2)*exp(-((evalvect[2]-meanvect[2])**2)/sigmabasez**2)
 
 class AFMdata:
     """ Class for opening HDF5 file. """
@@ -123,7 +123,8 @@ class AFMdata:
                               sigmabasexy=1.0,
                               sigmabasez=1.0, 
                               amplificationFactor=1.0, 
-                              returnAtomPositions=False):
+                              returnAtomPositions=False,
+                              verbose=True):
         """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. 
         Output channels has to match the method.
         Methods are: xymap_collapsed, xymap_projection, singleAtom
@@ -134,9 +135,10 @@ class AFMdata:
             batch_atomPositions=[]
             
         for i in range(0,batchsize):
-            randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
-            randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
-            print 'Looking at file ' + randomorientation.name
+            randommolecule=self.f[random.choice(list(self.f.keys()))]  # Choose a random molecule
+            randomorientation=randommolecule[random.choice(list(randommolecule.keys()))]   # Choose a random Orientation
+            if verbose:
+                print('Looking at file ' + randomorientation.name)
 
             batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
             if method=='xymap_collapsed':
@@ -154,7 +156,7 @@ class AFMdata:
         else:
             return {'forces': batch_Fz, 'solutions': batch_solutions}
     
-    def batch(self, batchsize, outputChannels=1, returnAtomPositions=False):
+    def batch(self, batchsize, outputChannels=1, returnAtomPositions=False, verbose=True):
         """ Returns (training)batches as dictionaries with 'forces' and 'solutions' with arrays of shape
         forces: (batchsize,)+shape
         solutions: (batchsize,)+shape[:-2]+(outputChannels,)"""
@@ -168,7 +170,8 @@ class AFMdata:
         for i in range(0,batchsize):
             randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
             randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
-            print 'Looking at file ' + randomorientation.name
+            if verbose:
+                print('Looking at file ' + randomorientation.name)
 
             batch_Fz[i]=randomorientation['fzvals'][...].reshape(self.shape)
             if outputChannels == 1:
@@ -231,7 +234,7 @@ class AFMdata:
 
         
 if __name__=='__main__':
-    print 'Hallo Main'
+    print('Hallo Main')
     datafile = AFMdata('/l/reischt1/toyDB_v09_oneAtomShifted.hdf5', shape=(41,41,41,1))
     print(datafile.solution_xymap_collapsed('molecule1/orientation1'))
-    
+    print(datafile.batch_runtimeSolution(20))
