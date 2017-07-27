@@ -77,15 +77,25 @@ def conv3d(x, W):
     return tf.nn.conv3d(x, W, strides=[1,1,1,1,1], padding='SAME')
 
 def make_viewfile(parameters, testaccuracy, predictions, labels, atomPosition):
+    print('Opening viewfile')
     viewfile = h5py.File(parameters['viewPath'], 'w')
+    print('start writing attrs')
     viewfile.attrs['testaccuracy']=testaccuracy
     for key in parameters.keys():
-        viewfile.attrs[key]=parameters[key]
+        print(key, parameters[key])
+        try:
+            viewfile.attrs[key]=parameters[key]
+        except TypeError:
+            viewfile.attrs[key]=False
+    print('create dataset: predictions')
     viewfile.create_dataset('predictions', data=predictions)
+    print('create dataset: solutiond')
     viewfile.create_dataset('solutions', data=labels)
+    print('create dataset: AtomPosition')
     viewfile.create_dataset('AtomPosition', data=atomPosition)
     viewfile.close()
-
+    
+    
 def define_model(Fz_xyz, logfile):
 
     logfile.write('now define conv1 \n')

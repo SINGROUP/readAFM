@@ -2,7 +2,6 @@ import numpy as np
 import random
 import h5py
 from math import exp
-import numpy as np
 import time
 
 def atomSignal(evalvect, meanvect, atomNameString, sigmabasexy=1.0, sigmabasez=1.0, amplification=1.0):
@@ -13,7 +12,7 @@ def atomSignal(evalvect, meanvect, atomNameString, sigmabasexy=1.0, sigmabasez=1
     I think it can be interpreted as a length in A.
     """
     covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
-    [sigmabasexy, sigmabasez] = [sigmabasexy, sigmabasez]*((covalentRadii[atomNameString])/76)
+    [sigmabasexy, sigmabasez] = map(lambda x: x*((float(covalentRadii[atomNameString]))/76.),[sigmabasexy, sigmabasez])
     normalisation = amplification*(covalentRadii[atomNameString])/76.
     return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2)/sigmabasexy**2)*exp(-((evalvect[2]-meanvect[2])**2)/sigmabasez**2)
 
@@ -124,7 +123,9 @@ class AFMdata:
                               sigmabasez=1.0, 
                               amplificationFactor=1.0, 
                               returnAtomPositions=False,
-                              verbose=True):
+                              verbose=True, 
+                              orientationsOnly=False,
+                              rootGroup='/'):
         """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. 
         Output channels has to match the method.
         Methods are: xymap_collapsed, xymap_projection, singleAtom
@@ -134,9 +135,23 @@ class AFMdata:
         if returnAtomPositions:
             batch_atomPositions=[]
             
-        for i in range(0,batchsize):
-            randommolecule=self.f[random.choice(list(self.f.keys()))]  # Choose a random molecule
-            randomorientation=randommolecule[random.choice(list(randommolecule.keys()))]   # Choose a random Orientation
+        # make sample keylist here with random.sample and then iterate through it
+
+        randomkeys = []
+        if orientationsOnly:
+            print(self.f)
+            randomkeys = random.sample(list(self.f[rootGroup].keys()), batchsize)
+            randomkeys = [self.f[rootGroup][i].name for i in randomkeys]
+
+        else:
+            for i in range(batchsize):
+                randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
+                randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
+                randomkeys.append(randomorientation.name)
+            
+        for i in range(batchsize):
+            
+            randomorientation=self.f[randomkeys[i]]
             if verbose:
                 print('Looking at file ' + randomorientation.name)
 
@@ -156,7 +171,7 @@ class AFMdata:
         else:
             return {'forces': batch_Fz, 'solutions': batch_solutions}
     
-    def batch(self, batchsize, outputChannels=1, returnAtomPositions=False, verbose=True):
+    def batch(self, batchsize, outputChannels=1, returnAtomPositions=False, verbose=True, orientationsOnly=False):
         """ Returns (training)batches as dictionaries with 'forces' and 'solutions' with arrays of shape
         forces: (batchsize,)+shape
         solutions: (batchsize,)+shape[:-2]+(outputChannels,)"""
@@ -168,8 +183,11 @@ class AFMdata:
             batch_atomPositions=[]
         
         for i in range(0,batchsize):
-            randommolecule=self.f[random.choice(self.f.keys())]  # Choose a random molecule
-            randomorientation=randommolecule[random.choice(randommolecule.keys())]   # Choose a random Orientation
+            randommolecule=self.f[random.choice(list(self.f.keys()))]  # Choose a random molecule
+            if orientationsOnly:
+                randomorientation = randommolecule  # There is no molecule-level
+            else:
+                randomorientation=randommolecule[random.choice(list(randommolecule.keys()))]   # Choose a random Orientation
             if verbose:
                 print('Looking at file ' + randomorientation.name)
 
@@ -235,6 +253,6 @@ class AFMdata:
         
 if __name__=='__main__':
     print('Hallo Main')
-    datafile = AFMdata('/l/reischt1/toyDB_v09_oneAtomShifted.hdf5', shape=(41,41,41,1))
-    print(datafile.solution_xymap_collapsed('molecule1/orientation1'))
-    print(datafile.batch_runtimeSolution(20))
+    datafile = AFMdata('/l/reischt1/toyDB_v15_merged.hdf5', shape=(41,41,41,1))
+#     print(datafile.solution_xymap_collapsed('molecule1/orientation1'))
+    print(datafile.batch_runtimeSolution(20, orientationsOnly=True, rootGroup='/train'))
