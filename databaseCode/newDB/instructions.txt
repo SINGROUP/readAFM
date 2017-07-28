@@ -1,0 +1,24 @@
+Instructions to make a database when you already have a bunch of XYZ files:
+
+In case you want a toy DB, you can write separate code to generate the XYZ files before following these instructions.
+
+The input file for MechAFM remains the same for each XYZ file, and so does the parameters file
+
+
+1:  Open template.job and edit the triton memory and time requirements. Edit the location of the mechafm-omp executable. Edit the other python files to the right address: MAKEBINARY and COMPILEOUT
+2:  Copy all the input XYZ files you have into a directory with no other file in it
+3:  Copy the file template.job into this directory. Now the contents of this directory is entirely composed of XYZ files and one template.job file
+4:  Open the file masterscript.sh and edit it so that the INPUTXYZFOLDER points to the above mentioned directory. Also edit OUTPUTXYZ to the directory which will contain the output. Same with DOSTUFF. Link it to the dostuff.py file
+5:  Please note that template.job must only be executed as part of masterscript as it contains code to remove directories and files after their data has been copied. If template.job is executed in the wrong directry, it might delete important files
+6:  dostuff.py contains the contents of the parameters file. So all edits can be made there. The main purpose of dostuff.py is to call rotatexyz.py
+7:  rotatexyz.py contains the contents of the input.scan file. The number of rotations per XYZ file can be changed here. By default it's 100. This code makes directories within OUTPUTXYZ and in each directory, it copies the xyz file, the .scan file
+8:  makeBinaryHDF5.py takes one single orientation and compiles the output of MechAFM, the XYZ files and all other required information into a binary file. There will be a binary file for each orientation. The title would be out0.hdf5, out1.hdf5 etc. corresponding to the orientation number
+9:  compileOutHDF5.py compiles the binary files for all the orientations into one single file. This will result in one binary file per molecule (i.e. per XYZ file)
+10: Please note that makeBinaryHDF5.py assumes that the names of the XYZ files are according to the database found in Nature mag. Molecules are named "dsgdb9nsd_000001.xyz" and so on. The comments in the code will help you identify what edits need to be made to make this more general
+11: Now you may run the masterscript.sh which automatically queues the jobs on Triton
+12: After all the jobs are complete, you may compile all the binary files into one single binary file. The python script "compileAllBinaryHDF5.py" will do this. Please make sure that the location of the directory where the binary files reside has been specified within the python script. The output file will appear at the same location as the script
+13: DONE
+
+
+Further clarification can be obtained from the comments in the individual files
+For more info, contact Dhananjay Varma at dhanrajvarma2@gmail.com
