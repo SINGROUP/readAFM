@@ -91,8 +91,8 @@ def make_viewfile(parameters, testaccuracy, predictions, labels, atomPosition):
     viewfile.create_dataset('predictions', data=predictions)
     print('create dataset: solutiond')
     viewfile.create_dataset('solutions', data=labels)
-    print('create dataset: AtomPosition')
-    viewfile.create_dataset('AtomPosition', data=atomPosition)
+    print('Add attr: AtomPosition')
+    viewfile.attrs['AtomPosition'] = atomPosition
     viewfile.close()
     
     
