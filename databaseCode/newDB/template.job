@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH --time=0-01:30:00    # 1 hours 30 minutes
+#SBATCH --mem-per-cpu=2000    # 2000MB of memory
+
+
+MECHAFM=$WRKDIR/MechAFM/bin/mechafm-omp
+MAKEBINARY=$WRKDIR/varmad1/MechAFM/myCode/makeBinaryHDF5.py
+COMPILEOUT=$WRKDIR/varmad1/MechAFM/myCode/compileOutHDF5.py
+for i in *.scan; do
+    AFMOUTPUT=${i%.scan}
+    $MECHAFM $i $AFMOUTPUT
+    python $MAKEBINARY -i $i
+    rm -r $AFMOUTPUT
+    rm $i
+    rm ${AFMOUTPUT}.xyz
+done
+python $COMPILEOUT -i $PWD
+FOO=$PWD
+COMPILEDOUTFILE=$PWD/${PWD##*/}.hdf5
+mv $COMPILEDOUTFILE ../
+rm -r $FOO
