@@ -58,10 +58,10 @@ def safe_open(path, mode, buffersize=None):
     ''' Open "path" for writing, creating any parent directories as needed.
     '''
     mkdir_p(os.path.dirname(path))
-    if buffersize:
-        return open(path, mode, buffersize)
-    else:
+    if buffersize is None:
         return open(path, mode)
+    else:
+        return open(path, mode, buffersize)
 
 
 
