@@ -164,10 +164,10 @@ class AFMdata:
                 batch_solutions[i]=self.solution_singleAtom(randomorientation.name, sigmabasexy, sigmabasez, amplificationFactor)[...]
                 
             if returnAtomPositions:
-                batch_atomPositions.append(randomorientation['atomPosition'][...])
+                batch_atomPositions.append([randomorientation.attrs['atomNameString'], randomorientation['atomPosition'][...]])
                 
         if returnAtomPositions:
-            return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': np.array(batch_atomPositions)}
+            return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': batch_atomPositions}
         else:
             return {'forces': batch_Fz, 'solutions': batch_solutions}
     
@@ -201,7 +201,7 @@ class AFMdata:
                 batch_atomPositions.append(randomorientation['atomPosition'][...])
 
         if returnAtomPositions:
-            return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': np.array(batch_atomPositions)}
+            return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': map(str,batch_atomPositions)}
         else:
             return {'forces': batch_Fz, 'solutions': batch_solutions}    
         
@@ -255,4 +255,5 @@ if __name__=='__main__':
     print('Hallo Main')
     datafile = AFMdata('/l/reischt1/toyDB_v15_merged.hdf5', shape=(41,41,41,1))
 #     print(datafile.solution_xymap_collapsed('molecule1/orientation1'))
-    print(datafile.batch_runtimeSolution(20, orientationsOnly=True, rootGroup='/train'))
+    testbatch = datafile.batch_runtimeSolution(20, orientationsOnly=True, rootGroup='/train', returnAtomPositions=True)
+    print testbatch['atomPosition']
