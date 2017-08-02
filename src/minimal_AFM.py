@@ -23,9 +23,8 @@ parsedParameters = parseInputFile(args.input_file)
 
 # These are the default Parameters!
 parameters = {'train': True,
-              'restorePath': None,                                                # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
-              'savePath': None,         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
-#               'savePath': "../save{}/CNN_minimal_TR1.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
+              'restorePath': None, # Typically: "./CNN_minimal_TR1_{}.ckpt"
+              'savePath': None,         # Typically: "CNN_minimal_TR1_{}.ckpt".format(args.name)
               'DBPath': '../AFMDB_version_01.hdf5',
               'DBShape': [81,81,41,1],
               'outChannels': 1,
@@ -44,7 +43,8 @@ parameters = {'train': True,
               'RuntimeSol.sigmabasexy': 1.0,
               'RUntimeSol.sigmabasez': 1.0, 
               'RuntimeSol.amplificationFactor': 1.0,
-              'numberTBImages': 5
+              'numberTBImages': 5,
+              'logEvery': 100
               }
 
 parameters.update(parsedParameters)
@@ -52,6 +52,9 @@ parameters.update(parsedParameters)
 LOGDIR = parameters['logdir']
 DBShape = parameters['DBShape']
 outChannels = parameters['outChannels']
+
+if LOGDIR[-1] != '/':
+    LOGDIR = LOGDIR + '/'
 
 # Output has to have the same xy dimensions as input (DBShape)
 
@@ -205,14 +208,16 @@ def train_model(Fz_xyz, solution, keep_prob, posxyz, logfile):
                                                       COMposition=parameters['RuntimeSol.COMposition'],
                                                       sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
                                                       sigmabasez=parameters['RuntimeSol.sigmabasez'],
-                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'])            
+                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                                      orientationsOnly=False,
+                                                      rootGroup='/')            
             else:
                 batch = AFMdata.batch(parameters['trainbatchSize'], outputChannels=parameters['outChannels'])
 
                 
             logfile.write('read batch successfully \n')
     
-            if i%100 == 0:
+            if i%parameters['logEvery'] == 0:
                 testbatch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
                                       outputChannels=parameters['outChannels'], 
                                       method=parameters['RuntimeSol.method'],
@@ -220,6 +225,8 @@ def train_model(Fz_xyz, solution, keep_prob, posxyz, logfile):
                                       sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
                                       sigmabasez=parameters['RuntimeSol.sigmabasez'],
                                       amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                      orientationsOnly=False,
+                                      rootGroup='/',
                                       returnAtomPositions=True)   
                 [train_accuracy, s] = sess.run([accuracy, summ], 
                                                feed_dict={Fz_xyz:testbatch['forces'], 
@@ -229,7 +236,7 @@ def train_model(Fz_xyz, solution, keep_prob, posxyz, logfile):
                 logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
                 writer.add_summary(s, i)
                 if parameters['savePath']:
-                    save_path=saver.save(sess, parameters['savePath'], i)
+                    save_path=saver.save(sess, LOGDIR+parameters['savePath'], i)
                     logfile.write("Model saved in file: %s \n" % save_path)
 
             train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
@@ -302,7 +309,9 @@ def eval_model(Fz_xyz, solution, keep_prob, posxyz, logfile):
                                                       sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
                                                       sigmabasez=parameters['RuntimeSol.sigmabasez'],
                                                       amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
-                                                      returnAtomPositions=True)            
+                                                      returnAtomPositions=True,
+                                                      orientationsOnly=False,
+                                                      rootGroup='/')            
         else:
             testbatch = AFMdata.batch(parameters['testbatchSize'], outputChannels=parameters['outChannels'], returnAtomPositions=True)
         
