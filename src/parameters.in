@@ -1,0 +1,19 @@
+# These are the default Parameters!
+restorePath   					: ../save01/CNN_minimal_TR1.ckpt-0
+savePath						: None
+DBPath							: ../AFMDB_version_01.hdf5
+DBShape							: [81,81,41,1]
+outChannels						: 1
+viewPath						: ../scratch/viewfile_{}.hdf5
+logPath					 		: ../scratch/out_minimal_{}.log
+trainstepsNumber				: 1
+trainbatchSize  				: 1 
+testbatchSize					: 1
+logdir							: ../save{}/
+infoString						: minimalAFM_{}
+LearningRate					: 0.001
+useRuntimeSolution				: False
+RuntimeSol.method				: xymap_collapsed 
+RuntimeSol.COMposition			: [0.,0.,0.] 
+RuntimeSol.sigmabase			: 1.0
+RuntimeSol.amplificationFactor	: 1.0

@@ -4,92 +4,168 @@ import readAFMHDF5 as readAFM
 import numpy as np
 import time
 import argparse
+import h5py
+from utils import * 
+
 
 parser = argparse.ArgumentParser()
-parser.add_argument("name")
+parser.add_argument("name", help="Name given to all output files.")
+parser.add_argument("-i", "--input_file", default="parameters.in", help="the path to the input file (default: %(default)s)")
+# parser.add_argument("-o", "--output", default="output/", help="produced files and folders will be saved here (default: %(default)s)")
 args=parser.parse_args()
 
-print('Parsed name argument {} of type {}.'.format(args.name, type(args.name)))
+# parser.add_argument("-v", "--verbosity", action="count", default=0)
 
-def weight_variable(shape):
+print('Parsed name argument {} of type {}.'.format(args.name, type(args.name)))
+print('Parsing parameters from {}'.format(args.input_file))
+
+parsedParameters = parseInputFile(args.input_file)
+
+# These are the default Parameters!
+parameters = {'train': True,
+              'restorePath': None, # Typically: "./CNN_minimal_TR1_{}.ckpt"
+              'savePath': None,         # Typically: "CNN_minimal_TR1_{}.ckpt".format(args.name)
+              'DBPath': '../AFMDB_version_01.hdf5',
+              'DBShape': [81,81,41,1],
+              'outChannels': 1,
+              'logdir': './save{}/'.format(args.name),
+              'viewPath': './viewfile_{}.hdf5'.format(args.name),
+              'logPath': './out_minimal_{}.log'.format(args.name),
+              'trainstepsNumber': 1,
+              'trainbatchSize':1,
+              'testbatchSize': 1,
+              'infoString': 'minimalAFM_{}'.format(args.name),
+              'LearningRate': 0.001,
+              'costWeight': 1.0,
+              'useRuntimeSolution': False,
+              'RuntimeSol.method': 'xymap_collapsed', 
+              'RuntimeSol.COMposition': [0.,0.,0.], 
+              'RuntimeSol.sigmabasexy': 1.0,
+              'RUntimeSol.sigmabasez': 1.0, 
+              'RuntimeSol.amplificationFactor': 1.0,
+              'numberTBImages': 5,
+              'logEvery': 100
+              }
+
+parameters.update(parsedParameters)
+
+LOGDIR = parameters['logdir']
+DBShape = parameters['DBShape']
+outChannels = parameters['outChannels']
+
+if LOGDIR[-1] != '/':
+    LOGDIR = LOGDIR + '/'
+
+# Output has to have the same xy dimensions as input (DBShape)
+
+
+
+def weight_variable(shape, name=None):
     """ Initializes the variable with random numbers (not 0) """
     initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial)
+    if name:
+        return tf.Variable(initial, name=name)
+    else:
+        return tf.Variable(initial)
 
-def bias_variable(shape):
+def bias_variable(shape, name=None):
     """ Initializes the bias variable with 0.1 everywhere """
     initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+    if name:
+        return tf.Variable(initial, name=name)
+    else:
+        return tf.Variable(initial)
 
 def conv3d(x, W):
     """ Short definition of the convolution function for 3d """
     return tf.nn.conv3d(x, W, strides=[1,1,1,1,1], padding='SAME')
 
-
-# Import data -- TO DO!!! For this make a class with training and validation data, this is still just a dummy!!! Maybe ask Jay to program this?
-
-
-if __name__=='__main__':
-
-    logfile=open('out_minimal_{}.log'.format(args.name), 'w', 0)
-    logfile.write('Start with importing the data \n')
-    # AFMdata=readAFM.afmmolecule('dsgdb9nsd_000001.afmdata')
-    inputData=np.array((None,81,81,41,1))
-    solutionData = np.array((None,81,81,5))
-
-    logfile.write('define the first two placeholders \n')
-    # Shape x: batch, x, y, z, Fz
-    Fz_xyz = tf.placeholder(tf.float32, [None, 81, 81, 41, 1])
-    # Standard output var -> one hot 5d (or so) vector for the atoms e.g. 0=O, 1=C, 2=F, ..., probably wrong dimensions!!! eithern [None, 5] for every pixel or [None, 41, 41, 5]
-    solution = tf.placeholder(tf.float32, [None, 81, 81, 5])
-
+def make_viewfile(parameters, testaccuracy, predictions, labels, atomPosition):
+    print('Opening viewfile')
+    viewfile = h5py.File(parameters['viewPath'], 'w')
+    print('start writing attrs')
+    viewfile.attrs['testaccuracy']=testaccuracy
+    for key in parameters.keys():
+        print(key, parameters[key])
+        try:
+            viewfile.attrs[key]=parameters[key]
+        except TypeError:
+            viewfile.attrs[key]=False
+    print('create dataset: predictions')
+    viewfile.create_dataset('predictions', data=predictions)
+    print('create dataset: solutiond')
+    viewfile.create_dataset('solutions', data=labels)
+    print('Add attr: AtomPosition')
+    viewfile.attrs['AtomPosition'] = atomPosition[0][1]
+    viewfile.close()
+    
+    
+def define_model(Fz_xyz, logfile):
 
     logfile.write('now define conv1 \n')
-    #1st conv layer: Convolve the input (Fz_xyz) with 16 different filters, don't do maxpooling!
-    W_conv1 = weight_variable([4,4,4,1,16])
-    b_conv1 = bias_variable([16])
-    
-    h_conv1 = tf.nn.relu(tf.add(conv3d(Fz_xyz, W_conv1),b_conv1))
-    #  h_pool1 = max_pool_2x2(h_conv1)
-
+    #1st conv layer: Convolve the input (Fz_xyz) with 16 different filters, don't do maxpooling!  
+    with tf.name_scope('conv1'):
+        w_conv1 = weight_variable([4,4,4,DBShape[-1],16], 'wcv1')
+        b_conv1 = bias_variable([16], 'bcv1')
+        convLayer_1 = tf.nn.tanh(tf.add(conv3d(Fz_xyz, w_conv1),b_conv1))
+        tf.summary.histogram("weights", w_conv1)
+        tf.summary.histogram("biases", b_conv1)
+        tf.summary.histogram("activations", convLayer_1)
 
     logfile.write('defining conv2 \n')
     #2nd conv layer: Convolve the result from layer 1 with 32 different filters, don't do maxpooling!
-    W_conv2 = weight_variable([4, 4, 4, 16, 32])
-    b_conv2 = bias_variable([32])
-    
-    h_conv2 = tf.nn.relu(tf.add(conv3d(h_conv1, W_conv2),b_conv2))
-    # h_pool2 = max_pool_2x2(h_conv2)
-    
+    with tf.name_scope('conv2'):
+        w_conv2 = weight_variable([4, 4, 4, 16, 32], 'wcv2')
+        b_conv2 =  bias_variable([32], 'bcv2')
+        convLayer_2 = tf.nn.tanh(tf.add(conv3d(convLayer_1, w_conv2),b_conv2))
+        tf.summary.histogram("weights", w_conv2)
+        tf.summary.histogram("biases", b_conv2)
+        tf.summary.histogram("activations", convLayer_2)
+                
     logfile.write('all conv layers defined, defining fc layer \n')
-    
-    #fully connected layer -- das muss anders aussehen
-    W_fc1 = weight_variable([41*32, 64])
-    b_fc1 = bias_variable([81, 81, 64])
-    
-    h_conv2_flat = tf.reshape(h_conv2, [-1, 81, 81, 41*32])
-    h_fc1 = tf.nn.relu(tf.tensordot(h_conv2_flat, W_fc1,axes=[[3],[0]])+b_fc1)  #Is this correct? the result of the tensordot and the b_fc1 don't have the same dimensions
+    # fc 1   
+    with tf.name_scope('fc'):
+        w_fc1 = weight_variable([DBShape[-2]*32, 64], 'wfc1')
+        b_fc1 = bias_variable(DBShape[:2]+[64,], 'bfc1')
+        convLayer_2_flat = tf.reshape(convLayer_2, [-1,]+DBShape[:2]+ [DBShape[-2]*32])
+        fcLayer_1 = tf.nn.relu(tf.tensordot(convLayer_2_flat, w_fc1,axes=[[3],[0]])+b_fc1)  #Is this correct? the result of the tensordot and the b_fc1 don't have the same dimensions
+        tf.summary.histogram("weights", w_fc1)
+        tf.summary.histogram("biases", b_fc1)
+        tf.summary.histogram("activations", fcLayer_1)
     
     # Dropout
-    keep_prob = tf.placeholder(tf.float32)
-    h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
+    with tf.name_scope('dropout'):
+        fcLayer_1_dropout = tf.nn.dropout(fcLayer_1, keep_prob)
     
     # Readout Layer
-    W_fc2 = weight_variable([64,5])
-    b_fc2 = bias_variable([81,81,5])
+    with tf.name_scope('outputLayer'):
+        w_out = weight_variable([64, outChannels], 'wout')
+        b_out = bias_variable(DBShape[:2]+[outChannels], 'bout')
+        outputLayer = tf.nn.relu(tf.add(tf.tensordot(fcLayer_1_dropout, w_out, axes=[[3],[0]]), b_out))
+        tf.summary.histogram("weights", w_out)
+        tf.summary.histogram("biases", b_out)
+        tf.summary.histogram("activations", outputLayer)
+        tf.summary.image('predictions', outputLayer, parameters['numberTBImages'])
+
+    return outputLayer
+
+def train_model(Fz_xyz, solution, keep_prob, posxyz, logfile):
+    # Define model:
+    outputLayer = define_model(Fz_xyz, logfile)
     
-    y_conv = tf.nn.relu(tf.add(tf.tensordot(h_fc1_drop, W_fc2, axes=[[3],[0]]), b_fc2))  # Forgot the relu here earlier!
+#     set up evaluation system
+    with tf.name_scope('cost'):
+        # cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize']) 
+        cost = (1.- parameters['costWeight'])*tf.reduce_sum(tf.multiply(tf.square(tf.subtract(outputLayer, solution)), solution))/float(parameters['trainbatchSize']) + parameters['costWeight']*tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize'])
+        tf.summary.scalar('cost', cost)
+        
+    with tf.name_scope('accuracy'):
+        accuracy = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['testbatchSize'])
+        tf.summary.scalar('accuracy',accuracy)
+#     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
     
-    # We should probalby normalize y_conv somehow?
-    
-    # set up evaluation system
-    classification = tf.reduce_mean(tf.abs(tf.subtract(y_conv, solution)))
-    # cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=solution, logits=y_conv))
-    train_step = tf.train.AdamOptimizer(0.001).minimize(classification)
-    # train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-    # correct_prediction = tf.equal(tf.argmax(y_conv,3), tf.argmax(solution,3))  # This might not be a very good function. Think more here.
-    correct_prediction = tf.abs(tf.subtract(y_conv, solution))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    with tf.name_scope('train'):
+        train_step = tf.train.AdamOptimizer(parameters['LearningRate']).minimize(cost)
     
     # Crate saver
     saver = tf.train.Saver()
@@ -99,72 +175,191 @@ if __name__=='__main__':
     
     # Start session
     logfile.write('it worked so far, now start session \n')
-    sess = tf.InteractiveSession()
+
+    summ = tf.summary.merge_all()
+
+    with tf.Session() as sess:
+        init_op.run()
     
-    sess.run(init_op)
-    
-    print("b_conv1, as initialized: ")
-    print(sess.run(b_conv1))
-    
-    # saver.restore(sess, "/scratch/work/reischt1/calculations/minimal_06_implement_start_from_checkpoint/save/CNN_minimal_TR1.ckpt")
-    # logfile.write("Model restored. \n")
-    # print("Model restored. See here b_conv1 restored:")
-    # print(sess.run(b_conv1))
-    # logfile.write('Variables initialized successfully \n')
-    
-    # AFMdata = readAFM.AFMdata('./AFMDB_version_01.hdf5')
-    AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
-    
-    
-    # Do stochastic training:
-    for i in range(1):
-        try:
+#         print("b_conv1, as initialized: ")
+#         print(sess.run(b_conv1))
+                
+#         Pack this into a function!
+        if parameters['restorePath']:
+            saver.restore(sess, parameters['restorePath'])
+            logfile.write("Model restored. \n")
+            print("Model restored. See here b_conv1 restored:")
+#             print(sess.run(b_conv1))
+            logfile.write('Variables initialized successfully \n')
+        
+        AFMdata = readAFM.AFMdata(parameters['DBPath'], shape=parameters['DBShape'])
+    #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
+        writer = tf.summary.FileWriter(LOGDIR)
+        writer.add_graph(sess.graph)        
+        
+        # Do stochastic training:
+        for i in range(parameters['trainstepsNumber']):
             logfile.write('Starting Run #%i \n'%(i))
             timestart=time.time()
-            batch = AFMdata.batch(50)
+            if parameters['useRuntimeSolution']:
+                batch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
+                                                      outputChannels=parameters['outChannels'], 
+                                                      method=parameters['RuntimeSol.method'],
+                                                      COMposition=parameters['RuntimeSol.COMposition'],
+                                                      sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
+                                                      sigmabasez=parameters['RuntimeSol.sigmabasez'],
+                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                                      orientationsOnly=False,
+                                                      rootGroup='/')            
+            else:
+                batch = AFMdata.batch(parameters['trainbatchSize'], outputChannels=parameters['outChannels'])
+
+                
             logfile.write('read batch successfully \n')
     
-            if i%100 == 0:
-                train_accuracy = accuracy.eval(feed_dict={Fz_xyz:batch[0], solution: batch[1], keep_prob: 1.0})
+            if i%parameters['logEvery'] == 0:
+                testbatch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
+                                      outputChannels=parameters['outChannels'], 
+                                      method=parameters['RuntimeSol.method'],
+                                      COMposition=parameters['RuntimeSol.COMposition'],
+                                      sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
+                                      sigmabasez=parameters['RuntimeSol.sigmabasez'],
+                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                      orientationsOnly=False,
+                                      rootGroup='/',
+                                      returnAtomPositions=True)   
+                [train_accuracy, s] = sess.run([accuracy, summ], 
+                                               feed_dict={Fz_xyz:testbatch['forces'], 
+                                                          solution: testbatch['solutions'], 
+                                                          keep_prob: 1.0, 
+                                                          posxyz: [map(str, bla) for bla in testbatch['atomPosition']]})
                 logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
-                save_path=saver.save(sess, "./save/CNN_minimal_TR1_{}.ckpt".format(args.name))
-                logfile.write("Model saved in file: %s \n" % save_path)
+                writer.add_summary(s, i)
+                if parameters['savePath']:
+                    save_path=saver.save(sess, LOGDIR+parameters['savePath'], i)
+                    logfile.write("Model saved in file: %s \n" % save_path)
+
+            train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
+            timeend=time.time()
+            logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
+
+        
+        
+        if parameters['useRuntimeSolution']:
+            testbatch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
+                                                      outputChannels=parameters['outChannels'], 
+                                                      method=parameters['RuntimeSol.method'],
+                                                      COMposition=parameters['RuntimeSol.COMposition'],
+                                                      sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
+                                                      sigmabasez=parameters['RuntimeSol.sigmabasez'],
+                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                                      returnAtomPositions=True)            
+        else:
+            testbatch = AFMdata.batch(parameters['testbatchSize'], outputChannels=parameters['outChannels'], returnAtomPositions=True)
+        
+        
+        [testaccuracy, s] = sess.run([accuracy, summ], feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0, posxyz: [map(str, bla) for bla in testbatch['atomPosition']]})
+        logfile.write("test accuracy %g \n"%testaccuracy)
+        
+        make_viewfile(parameters, testaccuracy, outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}), testbatch['solutions'], testbatch['atomPosition'])
+        
+    return 0
+
+def eval_model(Fz_xyz, solution, keep_prob, posxyz, logfile):
+    # Define model:
+    outputLayer = define_model(Fz_xyz, logfile)
     
-                train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
-                timeend=time.time()
-                logfile.write('ran train step in %f seconds \n' % (timeend-timestart))
-        except IndexError:
-            print 'Index Error for this File'
+#     set up evaluation system
+    with tf.name_scope('accuracy'):
+        accuracy = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['testbatchSize'])
+        tf.summary.scalar('accuracy',accuracy)
+#     accuracy = tf.reduce_mean(tf.cast(tf.abs(tf.subtract(prediction, solution)), tf.float32))
+
+    # Crate saver
+    saver = tf.train.Saver()
     
-    testbatch = AFMdata.batch(50)
-    logfile.write("test accuracy %g \n"%accuracy.eval(feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0}))
+    # Init op
+    init_op = tf.global_variables_initializer()
+    
+    # Start session
+    logfile.write('it worked so far, now start session \n')
+
+
+    summ = tf.summary.merge_all()
+
+    with tf.Session() as sess:
+        init_op.run()
+    
+        if parameters['restorePath']:
+            saver.restore(sess, parameters['restorePath'])
+            logfile.write("Model restored. \n")
+            print("Model restored.")
+            logfile.write('Variables initialized successfully \n')
+        
+        AFMdata = readAFM.AFMdata(parameters['DBPath'], shape=parameters['DBShape'])
+    #     AFMdata = readAFM.AFMdata('/tmp/reischt1/AFMDB_version_01.hdf5')
+        writer = tf.summary.FileWriter(LOGDIR)
+        writer.add_graph(sess.graph)
+        
+        if parameters['useRuntimeSolution']:
+            testbatch = AFMdata.batch_runtimeSolution(parameters['testbatchSize'], 
+                                                      outputChannels=parameters['outChannels'], 
+                                                      method=parameters['RuntimeSol.method'],
+                                                      COMposition=parameters['RuntimeSol.COMposition'],
+                                                      sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
+                                                      sigmabasez=parameters['RuntimeSol.sigmabasez'],
+                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                                      returnAtomPositions=True,
+                                                      orientationsOnly=False,
+                                                      rootGroup='/')            
+        else:
+            testbatch = AFMdata.batch(parameters['testbatchSize'], outputChannels=parameters['outChannels'], returnAtomPositions=True)
+        
+
+        [testaccuracy, s] = sess.run([accuracy, summ],feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0, posxyz: [map(str, bla) for bla in testbatch['atomPosition']]})     
+
+        logfile.write("test accuracy %g \n"%testaccuracy)
+        writer.add_summary(s)
+        
+        # Save two np.arrays to be able to view it later.
+        # make_viewfile(parameters, testaccuracy, outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}), testbatch['solutions'], testbatch['atomPosition'])
+        
+    return 0
+
+
+
+if __name__=='__main__':
     
     
-    # Save two np.arrays to be able to view it later.
-    viewfile_prediction=open('view_prediction_{}.npy'.format(args.name), 'w')
-    viewfile_solution=open('view_solution_{}.npy'.format(args.name), 'w')
-    np.save(viewfile_prediction, y_conv.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}))
-    np.save(viewfile_solution, testbatch['solutions'])
-    viewfile_prediction.close()
-    viewfile_solution.close()
-    logfile.write('produced viewfiles')
+    logfile=safe_open(parameters['logPath'], 'w', 0)
+
+    logfile.write('define the  placeholders \n')
+    Fz_xyz = tf.placeholder(tf.float32, [None,]+DBShape)
+    tf.summary.image('Fzinput_0', Fz_xyz[:,:,:,0,:], parameters['numberTBImages'])
+    tf.summary.image('Fzinput_half', Fz_xyz[:,:,:,int(Fz_xyz.shape[2]/2),:], parameters['numberTBImages'])
+    tf.summary.image('Fzinput_last', Fz_xyz[:,:,:,-1,:], parameters['numberTBImages'])
+    print(int(Fz_xyz.shape[2]/2))
     
+    solution = tf.placeholder(tf.float32, [None,]+DBShape[:2]+[outChannels])
+    tf.summary.image('solutions', solution, parameters['numberTBImages'])
+
+    posxyz = tf.placeholder(tf.string, [None, 2])
+    posxyzcropped = posxyz[:parameters['numberTBImages'], :]
+    tf.summary.text('posxyz', posxyzcropped)
+
+
+    keep_prob = tf.placeholder(tf.float32)
+    
+    print(parameters['train'])
+
+    if parameters['train']:
+        print('Start training:')
+        train_model(Fz_xyz, solution, keep_prob, posxyz, logfile)
+    else:
+        print('Start evaluation:')
+        eval_model(Fz_xyz, solution, keep_prob, posxyz, logfile)
+
+        
     logfile.write('finished! \n')
     logfile.close()
     print 'Finished!'
-                
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
