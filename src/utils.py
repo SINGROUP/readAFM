@@ -3,6 +3,8 @@ import sys
 import os, os.path
 import errno
 import time
+import h5py
+import numpy as np
 
 
 def is_float(s):
@@ -80,6 +82,25 @@ def progressmod4(i):
 
 def progresspercent(i, imax):
     eprint('\r Running ... {: 5.1f} %'.format(float(i)/(imax)*100.), end='')
+
+def make_viewfile(parameters, testaccuracy, predictions, labels, atomPosition):
+    print('Opening viewfile')
+    viewfile = h5py.File(parameters['viewPath'], 'w')
+    print('start writing attrs')
+    viewfile.attrs['testaccuracy']=testaccuracy
+    for key in parameters.keys():
+        print(key, parameters[key])
+        try:
+            viewfile.attrs[key]=parameters[key]
+        except TypeError:
+            viewfile.attrs[key]=False
+    print('create dataset: predictions')
+    viewfile.create_dataset('predictions', data=predictions)
+    print('create dataset: solutiond')
+    viewfile.create_dataset('solutions', data=labels)
+    print('Add attr: AtomPosition')
+    viewfile.attrs['AtomPosition'] = atomPosition[0][1]
+    viewfile.close()
 
 
 if __name__ == '__main__':
