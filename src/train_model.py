@@ -104,9 +104,9 @@ def train_model(model_function, Fz_xyz, solution, keep_prob, posxyz, parameters,
                                                           posxyz: [map(str, bla) for bla in testbatch['atomPosition']]})
                 logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
                 writer.add_summary(s, i)
-                if parameters['savePath']:
-                    save_path=saver.save(sess, LOGDIR+parameters['savePath'], i)
-                    logfile.write("Model saved in file: %s \n" % save_path)
+            if i%parameters['saveEvery']==0 and parameters['saveName']:
+                save_path=saver.save(sess, LOGDIR+parameters['saveName'], i)
+                logfile.write("Model saved in file: %s \n" % save_path)
 
             train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
             timeend=time.time()

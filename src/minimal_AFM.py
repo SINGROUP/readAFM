@@ -23,7 +23,7 @@ if __name__=='__main__':
     # These are the default Parameters!
     parameters = {'train': True,
                   'restorePath': None, # Typically: "./CNN_minimal_TR1_{}.ckpt"
-                  'savePath': None,         # Typically: "CNN_minimal_TR1_{}.ckpt".format(args.name)
+                  'saveName': "CNN_minimal_TR1_{}.ckpt".format(args.name),         # Typically: "CNN_minimal_TR1_{}.ckpt".format(args.name)
                   'DBPath': '../AFMDB_version_01.hdf5',
                   'DBShape': [81,81,41,1],
                   'outChannels': 1,
@@ -43,7 +43,8 @@ if __name__=='__main__':
                   'RUntimeSol.sigmabasez': 1.0, 
                   'RuntimeSol.amplificationFactor': 1.0,
                   'numberTBImages': 5,
-                  'logEvery': 100
+                  'logEvery': 100,
+                  'saveEvery': 100
                   }
     
     parameters.update(parsedParameters)
