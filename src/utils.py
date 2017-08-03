@@ -1,5 +1,9 @@
+from __future__ import print_function
+import sys
 import os, os.path
 import errno
+import time
+
 
 def is_float(s):
     try:
@@ -50,15 +54,38 @@ def mkdir_p(path):
             pass
         else: raise
 
-def safe_open_w(path):
+def safe_open(path, mode, buffersize=None):
     ''' Open "path" for writing, creating any parent directories as needed.
     '''
     mkdir_p(os.path.dirname(path))
-    return open(path, 'w')
+    if buffersize is None:
+        return open(path, mode)
+    else:
+        return open(path, mode, buffersize)
 
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+def progressmod4(i):
+    if i%4==0:
+        eprint('\r -', end='')
+    elif i%4==1:
+        eprint('\r /', end='')
+    elif i%4==2:
+        eprint('\r |', end='')
+    elif i%4==3:
+        eprint('\r \\', end='')
+
+def progresspercent(i, imax):
+    eprint('\r Running ... {: 5.1f} %'.format(float(i)/(imax)*100.), end='')
 
 
 if __name__ == '__main__':
     print(parseInputFile('./parameters.in'))
+    for i in range(100):
+        time.sleep(0.1)
+        progresspercent(i, 99)
 #     with safe_open_w('/Users/bill/output/output-text.txt') as f:
 #         f.write(...)

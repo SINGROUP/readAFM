@@ -23,9 +23,8 @@ parsedParameters = parseInputFile(args.input_file)
 
 # These are the default Parameters!
 parameters = {'train': True,
-              'restorePath': None,                                                # Typically: "./save/CNN_minimal_TR1_{}.ckpt"
-              'savePath': None,         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
-#               'savePath': "../save{}/CNN_minimal_TR1.ckpt".format(args.name),         # Typically: 'savePath': "./save/CNN_minimal_TR1_{}.ckpt".format(args.name)
+              'restorePath': None, # Typically: "./CNN_minimal_TR1_{}.ckpt"
+              'savePath': None,         # Typically: "CNN_minimal_TR1_{}.ckpt".format(args.name)
               'DBPath': '../AFMDB_version_01.hdf5',
               'DBShape': [81,81,41,1],
               'outChannels': 1,
@@ -43,7 +42,9 @@ parameters = {'train': True,
               'RuntimeSol.COMposition': [0.,0.,0.], 
               'RuntimeSol.sigmabasexy': 1.0,
               'RUntimeSol.sigmabasez': 1.0, 
-              'RuntimeSol.amplificationFactor': 1.0
+              'RuntimeSol.amplificationFactor': 1.0,
+              'numberTBImages': 5,
+              'logEvery': 100
               }
 
 parameters.update(parsedParameters)
@@ -51,6 +52,9 @@ parameters.update(parsedParameters)
 LOGDIR = parameters['logdir']
 DBShape = parameters['DBShape']
 outChannels = parameters['outChannels']
+
+if LOGDIR[-1] != '/':
+    LOGDIR = LOGDIR + '/'
 
 # Output has to have the same xy dimensions as input (DBShape)
 
@@ -92,7 +96,7 @@ def make_viewfile(parameters, testaccuracy, predictions, labels, atomPosition):
     print('create dataset: solutiond')
     viewfile.create_dataset('solutions', data=labels)
     print('Add attr: AtomPosition')
-    viewfile.attrs['AtomPosition'] = atomPosition
+    viewfile.attrs['AtomPosition'] = atomPosition[0][1]
     viewfile.close()
     
     
@@ -141,11 +145,11 @@ def define_model(Fz_xyz, logfile):
         tf.summary.histogram("weights", w_out)
         tf.summary.histogram("biases", b_out)
         tf.summary.histogram("activations", outputLayer)
-        tf.summary.image('predictions', outputLayer, 5)
+        tf.summary.image('predictions', outputLayer, parameters['numberTBImages'])
 
     return outputLayer
 
-def train_model(Fz_xyz, solution, keep_prob, logfile):
+def train_model(Fz_xyz, solution, keep_prob, posxyz, logfile):
     # Define model:
     outputLayer = define_model(Fz_xyz, logfile)
     
@@ -204,19 +208,35 @@ def train_model(Fz_xyz, solution, keep_prob, logfile):
                                                       COMposition=parameters['RuntimeSol.COMposition'],
                                                       sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
                                                       sigmabasez=parameters['RuntimeSol.sigmabasez'],
-                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'])            
+                                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                                      orientationsOnly=False,
+                                                      rootGroup='/')            
             else:
                 batch = AFMdata.batch(parameters['trainbatchSize'], outputChannels=parameters['outChannels'])
 
                 
             logfile.write('read batch successfully \n')
     
-            if i%100 == 0:
-                [train_accuracy, s] = sess.run([accuracy, summ], feed_dict={Fz_xyz:batch['forces'], solution: batch['solutions'], keep_prob: 1.0})
+            if i%parameters['logEvery'] == 0:
+                testbatch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
+                                      outputChannels=parameters['outChannels'], 
+                                      method=parameters['RuntimeSol.method'],
+                                      COMposition=parameters['RuntimeSol.COMposition'],
+                                      sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
+                                      sigmabasez=parameters['RuntimeSol.sigmabasez'],
+                                      amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
+                                      orientationsOnly=False,
+                                      rootGroup='/',
+                                      returnAtomPositions=True)   
+                [train_accuracy, s] = sess.run([accuracy, summ], 
+                                               feed_dict={Fz_xyz:testbatch['forces'], 
+                                                          solution: testbatch['solutions'], 
+                                                          keep_prob: 1.0, 
+                                                          posxyz: [map(str, bla) for bla in testbatch['atomPosition']]})
                 logfile.write("step %d, training accuracy %g \n"%(i, train_accuracy))
                 writer.add_summary(s, i)
                 if parameters['savePath']:
-                    save_path=saver.save(sess, parameters['savePath'], i)
+                    save_path=saver.save(sess, LOGDIR+parameters['savePath'], i)
                     logfile.write("Model saved in file: %s \n" % save_path)
 
             train_step.run(feed_dict={Fz_xyz: batch['forces'], solution: batch['solutions'], keep_prob: 0.6})
@@ -238,14 +258,14 @@ def train_model(Fz_xyz, solution, keep_prob, logfile):
             testbatch = AFMdata.batch(parameters['testbatchSize'], outputChannels=parameters['outChannels'], returnAtomPositions=True)
         
         
-        testaccuracy=accuracy.eval(feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0})
+        [testaccuracy, s] = sess.run([accuracy, summ], feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0, posxyz: [map(str, bla) for bla in testbatch['atomPosition']]})
         logfile.write("test accuracy %g \n"%testaccuracy)
         
         make_viewfile(parameters, testaccuracy, outputLayer.eval(feed_dict={Fz_xyz: testbatch['forces'], keep_prob: 1.0}), testbatch['solutions'], testbatch['atomPosition'])
         
     return 0
 
-def eval_model(Fz_xyz, solution, keep_prob, logfile):
+def eval_model(Fz_xyz, solution, keep_prob, posxyz, logfile):
     # Define model:
     outputLayer = define_model(Fz_xyz, logfile)
     
@@ -264,6 +284,7 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
     # Start session
     logfile.write('it worked so far, now start session \n')
 
+
     summ = tf.summary.merge_all()
 
     with tf.Session() as sess:
@@ -281,18 +302,21 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
         writer.add_graph(sess.graph)
         
         if parameters['useRuntimeSolution']:
-            testbatch = AFMdata.batch_runtimeSolution(parameters['trainbatchSize'], 
+            testbatch = AFMdata.batch_runtimeSolution(parameters['testbatchSize'], 
                                                       outputChannels=parameters['outChannels'], 
                                                       method=parameters['RuntimeSol.method'],
                                                       COMposition=parameters['RuntimeSol.COMposition'],
                                                       sigmabasexy=parameters['RuntimeSol.sigmabasexy'],
                                                       sigmabasez=parameters['RuntimeSol.sigmabasez'],
                                                       amplificationFactor=parameters['RuntimeSol.amplificationFactor'],
-                                                      returnAtomPositions=True)            
+                                                      returnAtomPositions=True,
+                                                      orientationsOnly=False,
+                                                      rootGroup='/')            
         else:
             testbatch = AFMdata.batch(parameters['testbatchSize'], outputChannels=parameters['outChannels'], returnAtomPositions=True)
         
-        [testaccuracy, s] = sess.run([accuracy, summ],feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0})     
+
+        [testaccuracy, s] = sess.run([accuracy, summ],feed_dict={Fz_xyz: testbatch['forces'], solution: testbatch['solutions'], keep_prob: 1.0, posxyz: [map(str, bla) for bla in testbatch['atomPosition']]})     
 
         logfile.write("test accuracy %g \n"%testaccuracy)
         writer.add_summary(s)
@@ -307,17 +331,22 @@ def eval_model(Fz_xyz, solution, keep_prob, logfile):
 if __name__=='__main__':
     
     
-    logfile=safe_open_w(parameters['logPath'], 'w', 0)
+    logfile=safe_open(parameters['logPath'], 'w', 0)
 
     logfile.write('define the  placeholders \n')
     Fz_xyz = tf.placeholder(tf.float32, [None,]+DBShape)
-    tf.summary.image('Fzinput_0', Fz_xyz[:,:,:,0,:], 5)
-    tf.summary.image('Fzinput_half', Fz_xyz[:,:,:,int(Fz_xyz.shape[2]/2),:], 5)
-    tf.summary.image('Fzinput_last', Fz_xyz[:,:,:,-1,:], 5)
+    tf.summary.image('Fzinput_0', Fz_xyz[:,:,:,0,:], parameters['numberTBImages'])
+    tf.summary.image('Fzinput_half', Fz_xyz[:,:,:,int(Fz_xyz.shape[2]/2),:], parameters['numberTBImages'])
+    tf.summary.image('Fzinput_last', Fz_xyz[:,:,:,-1,:], parameters['numberTBImages'])
     print(int(Fz_xyz.shape[2]/2))
     
     solution = tf.placeholder(tf.float32, [None,]+DBShape[:2]+[outChannels])
-    tf.summary.image('solutions', solution, 5)
+    tf.summary.image('solutions', solution, parameters['numberTBImages'])
+
+    posxyz = tf.placeholder(tf.string, [None, 2])
+    posxyzcropped = posxyz[:parameters['numberTBImages'], :]
+    tf.summary.text('posxyz', posxyzcropped)
+
 
     keep_prob = tf.placeholder(tf.float32)
     
@@ -325,10 +354,10 @@ if __name__=='__main__':
 
     if parameters['train']:
         print('Start training:')
-        train_model(Fz_xyz, solution, keep_prob, logfile)
+        train_model(Fz_xyz, solution, keep_prob, posxyz, logfile)
     else:
         print('Start evaluation:')
-        eval_model(Fz_xyz, solution, keep_prob, logfile)
+        eval_model(Fz_xyz, solution, keep_prob, posxyz, logfile)
 
         
     logfile.write('finished! \n')
