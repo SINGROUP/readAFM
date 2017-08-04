@@ -41,7 +41,7 @@ class AFMdata:
         #print raw
         projected_array = np.zeros((self.f[datasetString].attrs['divxyz'][0], self.f[datasetString].attrs['divxyz'][1], 5))   # x, y, AtomNumber as in the dict
         masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 'F' : 18.9984}
-        covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}
+#         covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}
         # Calculate Center Of Mass:
         COM = np.array(COMposition)
         totalMass=0.0
@@ -315,7 +315,6 @@ if __name__=='__main__':
     testbatch = datafile.batch_runtimeSolution(20, orientationsOnly=True, rootGroup='/train', returnAtomPositions=True)
     print testbatch['atomPosition']
     blafile = h5py.File('toyDB_validationFile.h5py', 'w')
-    blafile.
     
     
     
