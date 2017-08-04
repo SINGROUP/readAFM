@@ -205,6 +205,63 @@ class AFMdata:
         else:
             return {'forces': batch_Fz, 'solutions': batch_solutions}    
         
+
+    def validationbatch_runtimeSolution(self, 
+                              batchsize, 
+                              outputChannels=1, 
+                              method='xymap_collapsed', 
+                              COMposition=[0.,0.,0.], 
+                              sigmabasexy=1.0,
+                              sigmabasez=1.0, 
+                              amplificationFactor=1.0, 
+                              returnAtomPositions=False,
+                              verbose=True, 
+                              orientationsOnly=True,
+                              rootGroup='/validation'):
+        """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. 
+        Output channels has to match the method.
+        Methods are: xymap_collapsed, xymap_projection, singleAtom
+        """
+        batch_Fz=np.zeros((batchsize,)+self.shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
+        batch_solutions=np.zeros((batchsize,)+self.shape[:-2]+(outputChannels,))
+        if returnAtomPositions:
+            batch_atomPositions=[]
+            
+        # make sample keylist here with random.sample and then iterate through it
+
+        keys = []
+        if orientationsOnly:
+            keys = list(self.f[rootGroup].keys())[:batchsize]
+            keys = [self.f[rootGroup][i].name for i in keys]
+
+        else:
+            raise KeyError('Validation is only possible with orientations only')
+        
+        for i in range(batchsize):
+            
+            orientation=self.f[keys[i]]
+            if verbose:
+                print('Looking at file ' + orientation.name)
+
+            batch_Fz[i]=orientation['fzvals'][...].reshape(self.shape)
+            if method=='xymap_collapsed':
+                batch_solutions[i]=self.solution_xymap_collapsed(orientation.name, COMposition, sigmabasexy, sigmabasez, amplificationFactor)[...]
+            elif method=='xymap_projection':
+                batch_solutions[i]=self.solution_xymap_projection(orientation.name, COMposition, sigmabasexy, sigmabasez, amplificationFactor)[...]
+            elif method=='singleAtom':
+                batch_solutions[i]=self.solution_singleAtom(orientation.name, sigmabasexy, sigmabasez, amplificationFactor)[...]
+            else:
+                raise IOError('No such method as {}'.format(method))
+                
+            if returnAtomPositions:
+                batch_atomPositions.append([orientation.attrs['atomNameString'], orientation['atomPosition'][...]])
+                
+        if returnAtomPositions:
+            return {'forces': batch_Fz, 'solutions': batch_solutions, 'atomPosition': batch_atomPositions}
+        else:
+            return {'forces': batch_Fz, 'solutions': batch_solutions}        
+        
+        
     def add_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
         
         for molstr in self.f.keys():
@@ -257,3 +314,8 @@ if __name__=='__main__':
 #     print(datafile.solution_xymap_collapsed('molecule1/orientation1'))
     testbatch = datafile.batch_runtimeSolution(20, orientationsOnly=True, rootGroup='/train', returnAtomPositions=True)
     print testbatch['atomPosition']
+    blafile = h5py.File('toyDB_validationFile.h5py', 'w')
+    blafile.
+    
+    
+    
