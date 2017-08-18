@@ -40,7 +40,7 @@ if __name__=='__main__':
                   'RuntimeSol.method': 'xymap_collapsed', 
                   'RuntimeSol.COMposition': [0.,0.,0.], 
                   'RuntimeSol.sigmabasexy': 1.0,
-                  'RUntimeSol.sigmabasez': 1.0, 
+                  'RuntimeSol.sigmabasez': 1.0, 
                   'RuntimeSol.amplificationFactor': 1.0,
                   'numberTBImages': 5,
                   'logEvery': 100,

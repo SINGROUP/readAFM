@@ -102,6 +102,13 @@ def make_viewfile(parameters, testaccuracy, predictions, labels, atomPosition):
     viewfile.attrs['AtomPosition'] = atomPosition[0][1]
     viewfile.close()
 
+def stripnumbers(string):
+     if string[-1].isdigit():
+         string=string[:-1]
+         string = stripnumbers(string)
+         return string
+     else:
+         return string
 
 if __name__ == '__main__':
     print(parseInputFile('./parameters.in'))

@@ -1,0 +1,33 @@
+\begin{thebibliography}{1}
+
+\bibitem{hapala2014}
+Prokop Hapala, Georgy Kichin, Christian Wagner, F~Stefan Tautz, Ruslan Temirov,
+  and Pavel Jel{\'\i}nek.
+\newblock Mechanism of high-resolution stm/afm imaging with functionalized
+  tips.
+\newblock {\em Physical Review B}, 90(8):085421, 2014.
+
+\bibitem{hamalainen2014}
+Sampsa~K H{\"a}m{\"a}l{\"a}inen, Nadine van~der Heijden, Joost van~der Lit,
+  Stephan den Hartog, Peter Liljeroth, and Ingmar Swart.
+\newblock Intermolecular contrast in atomic force microscopy images without
+  intermolecular bonds.
+\newblock {\em Physical review letters}, 113(18):186102, 2014.
+
+\bibitem{MIestimator}
+Yashasvi Ranavat.
+\newblock Mi estimator.
+\newblock https://github.com/SINGROUP/MutualInformation.
+
+\bibitem{krizhevsky2012imagenet}
+Alex Krizhevsky, Ilya Sutskever, and Geoffrey~E Hinton.
+\newblock Imagenet classification with deep convolutional neural networks.
+\newblock In {\em Advances in neural information processing systems}, pages
+  1097--1105, 2012.
+
+\bibitem{kingma2014adam}
+Diederik Kingma and Jimmy Ba.
+\newblock Adam: A method for stochastic optimization.
+\newblock {\em arXiv preprint arXiv:1412.6980}, 2014.
+
+\end{thebibliography}
