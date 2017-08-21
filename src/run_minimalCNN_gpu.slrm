@@ -1,20 +1,13 @@
 #!/bin/bash
 #SBATCH --time=04:00:00
-#SBATCH -p gpushort
 #SBATCH --gres=gpu:teslak80
-#SBATCH --mem=10G
-#SBATCH --exclude=gpu21
+#SBATCH --mem=5G
 
 module load anaconda2
 module load CUDA
 source activate /scratch/work/reischt1/tf-gpu
 
-# mkdir -p /tmp/reischt1/
-# time cp ./AFMDB_version_01.hdf5 /tmp/reischt1/
-# echo "Copied files, here a ls: "
-# ls /tmp/reischt1/
 echo "Starting minimal_AFM: "
-srun python minimal_AFM.py $SLURM_JOB_ID
-# time rm -r /tmp/reischt1/
+srun python minimal_AFM.py $1 -i $2
 
 source deactivate
