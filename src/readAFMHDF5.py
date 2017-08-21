@@ -18,7 +18,7 @@ def atomSignal(evalvect, meanvect, atomNameString, sigmabasexy=1.0, sigmabasez=1
 
 class AFMdata:
     """ Class for opening HDF5 file. """
-    def __init__(self, FileName, shape=(81, 81, 41, 1)):
+    def __init__(self, FileName, shape=(41, 41, 41, 1)):
         """ Opens hdf5 file FileName for reading. Shape has to contain the Shape of the DB, in the form (x,y,z,inChannels). """
         self.f = h5py.File(FileName, "r+")
         self.shape = tuple(shape)
