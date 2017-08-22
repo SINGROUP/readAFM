@@ -5,34 +5,65 @@ from math import exp
 import time
 
 def atomSignal(evalvect, meanvect, atomNameString, sigmabasexy=1.0, sigmabasez=1.0, amplification=1.0):
-    """ This is not a Normal Distribution!!! It's a gauss-like distribution, 
+    """ Calculates the signal at evalvect of the atom sitting at meanvect.
+    
+    This is not a Normal Distribution!!! It's a gaussian-like distribution, 
     but we normalize with the relative atom size instead of 1/sqrt(2*pi*sigma**2), 
     this is s.t. the different elements give different 'signals'. 
     Sigmabase is multiplied with the relative covalent ratius, with C corresponding to 1.
     I think it can be interpreted as a length in A.
+    
+    Args: 
+        evalvect: vector (np.array or list with at least 3 entries) where to evaluate the atomSignals
+        meanvect: vector (format as evalvect) for the position of the atom
+        sigmabasexy: 'standarddeviation' of the gaussian in the xy-plane
+        sigmabasez: 'standarrdeviation' of the gaussina in z-direction 
+        amplification: Factor to amplify the gaussian by. Basically the strength of the 'signal' of a C atom at its position. 
+        
+    Returns:
+        float, 'Signal' value, to be summed up at every position for every atom. 
     """
+    
     covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
     [sigmabasexy, sigmabasez] = map(lambda x: x*((float(covalentRadii[atomNameString]))/76.),[sigmabasexy, sigmabasez])
     normalisation = amplification*(covalentRadii[atomNameString])/76.
     return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2)/sigmabasexy**2)*exp(-((evalvect[2]-meanvect[2])**2)/sigmabasez**2)
 
 class AFMdata:
-    """ Class for opening HDF5 file. """
+    """ Class for opening the HDF5 file containing the DB. 
+    """
+    
     def __init__(self, FileName, shape=(41, 41, 41, 1)):
-        """ Opens hdf5 file FileName for reading. Shape has to contain the Shape of the DB, in the form (x,y,z,inChannels). """
+        """ Opens hdf5 file FileName for reading.
+        
+        Args:
+            FileName: string with the path to the hdf5 file containing the database.
+            shape: has to contain the Shape of the DB, in the form (x,y,z,inChannels). 
+        """
+        
         self.f = h5py.File(FileName, "r+")
         self.shape = tuple(shape)
  
 
     def solution_xymap_projection(self, datasetString, COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
-        """Returns solution to train. Project the atom positions on the xy-plane with Amplitudes decaying like a Gaussian with the radius as variance. and write it on the correct level of the np-array.
-        The last index of the array corresponds to the atom type:
+        """Returns solution to train. 
+        
+        Project the atom positions on the xy-plane with Amplitudes decaying like a Gaussian, specified in atomSignal. The output array has several output channels corresponding to the different elements. The last index of the array determines the element:
         0 = C
         1 = H
         2 = 0
         3 = N
         4 = F
-    
+        
+        Args:
+            datasetString: path to the dataset in the hdf5 file
+            COMposition: Center Of Mass position, some DBs have the COM centered at [.01, .01, .0]
+            sigmabasexy: 'standarddeviation' of the gaussian in the xy-plane
+            sigmabasez: 'standarrdeviation' of the gaussina in z-direction 
+            amplification: Factor to amplify the gaussian by. Basically the strength of the 'signal' of a C atom at its position. 
+            
+        Returns:
+            array with the same xy-dimensions as the db-shape, with the atom signals broken down to the atoms they result from.
         """
     
         atomNameString=self.f[datasetString].attrs['atomNameString']
@@ -95,11 +126,35 @@ class AFMdata:
     
         
     def solution_xymap_collapsed(self, dataSetString, COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
-        """Gives a version of the xymap solution collapsed to only one map, asking the question 'atom or not?' instead of 'What kind of atom?' """
+        """ Gives a version of the xymap solution collapsed to only one map, asking the question 'atom or not?' instead of 'What kind of atom?' 
+        
+        Args:
+            datasetString: path to the dataset in the hdf5 file
+            COMposition: Center Of Mass position, some DBs have the COM centered at [.01, .01, .0]
+            sigmabasexy: 'standarddeviation' of the gaussian in the xy-plane
+            sigmabasez: 'standarrdeviation' of the gaussina in z-direction 
+            amplification: Factor to amplify the gaussian by. Basically the strength of the 'signal' of a C atom at its position. 
+            
+        Returns:
+            array with the same xy-dimensions as the db-shape, with the atom signals collapsed down (=summed up) to one layer
+        
+        """
+        
         return np.sum(self.solution_xymap_projection(dataSetString, COMposition, sigmabasexy, sigmabasez, amplificationFactor),axis=-1, keepdims=True)
 
     def solution_singleAtom(self, orientationGroupString, sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
-        """ Adapted for the special case of the toyDB, that does not shift to the COM. """
+        """ Adapted for the special case of the toyDB containing a single atom, where the COM is not shifted. 
+        
+        Args:
+            orientationGroupString: path to the group in the hdf5 file
+            sigmabasexy: 'standarddeviation' of the gaussian in the xy-plane
+            sigmabasez: 'standarrdeviation' of the gaussina in z-direction 
+            amplification: Factor to amplify the gaussian by. Basically the strength of the 'signal' of a C atom at its position. 
+            
+        Returns:
+            array with the same xy-dimensions as the db-shape, containing the atom signals.
+
+        """
         atomPos = self.f[orientationGroupString+'/atomPosition'][0,:]
                 
         solutionArray = np.zeros((41,41,1))
@@ -127,9 +182,30 @@ class AFMdata:
                               orientationsOnly=False,
                               rootGroup='/'):
         """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. 
+
         Output channels has to match the method.
         Methods are: xymap_collapsed, xymap_projection, singleAtom
+
+        Args:
+            batchsize: batchsize, how many sets of fz-data + label should be returned
+            outputChannels: Number of output channels, should match the labelling method -> 'xymap_collapsed" and 'singleAtom' 1, 'xymap_projection' 5 or 12
+            method: method on how to calculate the solution (label), options are: xymap_collapsed, xymap_projection, singleAtom
+            COMposition: Center Of Mass position, some DBs have the COM centered at [.01, .01, .0]
+            sigmabasexy: 'standarddeviation' of the gaussian in the xy-plane
+            sigmabasez: 'standarrdeviation' of the gaussina in z-direction 
+            amplification: Factor to amplify the gaussian by. Basically the strength of the 'signal' of a C atom at its position. 
+            returnAtomPositions: If True, the AtomPositons are included in the return dictionary
+            verbose: If True, the name of the randomly selected molecules/orientations will be printed to stdout
+            orientationsOnly: Set False if the .hdf5 has the structure /rootGroup/moleculeXXXX/orientationXXXXX, set true if there is only one level /rootGroup/molXXXXortnXXXX
+            rootGroup: Which is the group to select randomly from? usually /train or /validation    
+            
+        Returns: a dictionary containing 
+            'forces': a np.ndarray of shape (batchsize,)+self.shape
+            'solutions': a np.ndarray of shape (batchsize,)+self.shape[:-2]+(outputChannels,)
+            'atomPosition': only if returnAtomPositions == True, a list containing the atom positions in the same order as they appear in the atomNameString
+            
         """
+        
         batch_Fz=np.zeros((batchsize,)+self.shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
         batch_solutions=np.zeros((batchsize,)+self.shape[:-2]+(outputChannels,))
         if returnAtomPositions:
@@ -172,9 +248,25 @@ class AFMdata:
             return {'forces': batch_Fz, 'solutions': batch_solutions}
     
     def batch(self, batchsize, outputChannels=1, returnAtomPositions=False, verbose=True, orientationsOnly=False):
-        """ Returns (training)batches as dictionaries with 'forces' and 'solutions' with arrays of shape
-        forces: (batchsize,)+shape
-        solutions: (batchsize,)+shape[:-2]+(outputChannels,)"""
+        """ Returns (training)batches as dictionaries with 'forces' and 'solutions'
+        
+        Use only with labelled databases, i.e. if the method 'add_labels' has been used on it before.
+
+        Args:
+            batchsize: batchsize, how many sets of fz-data + label should be returned
+            outputChannels: Number of output channels, should match the labelling method -> 'xymap_collapsed" and 'singleAtom' 1, 'xymap_projection' 5 or 12
+            returnAtomPositions: If True, the AtomPositons are included in the return dictionary
+            verbose: If True, the name of the randomly selected molecules/orientations will be printed to stdout
+            orientationsOnly: Set False if the .hdf5 has the structure /rootGroup/moleculeXXXX/orientationXXXXX, set true if there is only one level /rootGroup/molXXXXortnXXXX
+            
+        Returns: a dictionary containing 
+            'forces': a np.ndarray of shape (batchsize,)+self.shape
+            'solutions': a np.ndarray of shape (batchsize,)+self.shape[:-2]+(outputChannels,)
+            'atomPosition': only if returnAtomPositions == True, a list containing the atom positions in the same order as they appear in the atomNameString
+        """
+        
+#             rootGroup: Which is the group to select randomly from? usually /train or /validation    
+
         
         batch_Fz=np.zeros((batchsize,)+self.shape)
         batch_solutions=np.zeros((batchsize,)+self.shape[:2]+(outputChannels,))
@@ -218,9 +310,30 @@ class AFMdata:
                               verbose=True, 
                               orientationsOnly=True,
                               rootGroup='/validation'):
-        """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. 
+        """ To use if the DB contains no solutions or if one wants to skip the 'add_labels' step. Does not draw randomly. 
+
+        To use if one does not want randomly selected orientations. Is useful to be able to compare certain molecules analyzed with different neural nets.
         Output channels has to match the method.
         Methods are: xymap_collapsed, xymap_projection, singleAtom
+
+        Args:
+            batchsize: batchsize, how many sets of fz-data + label should be returned
+            outputChannels: Number of output channels, should match the labelling method -> 'xymap_collapsed" and 'singleAtom' 1, 'xymap_projection' 5 or 12
+            method: method on how to calculate the solution (label), options are: xymap_collapsed, xymap_projection, singleAtom
+            COMposition: Center Of Mass position, some DBs have the COM centered at [.01, .01, .0]
+            sigmabasexy: 'standarddeviation' of the gaussian in the xy-plane
+            sigmabasez: 'standarrdeviation' of the gaussina in z-direction 
+            amplification: Factor to amplify the gaussian by. Basically the strength of the 'signal' of a C atom at its position. 
+            returnAtomPositions: If True, the AtomPositons are included in the return dictionary
+            verbose: If True, the name of the randomly selected molecules/orientations will be printed to stdout
+            orientationsOnly: Set False if the .hdf5 has the structure /rootGroup/moleculeXXXX/orientationXXXXX, set true if there is only one level /rootGroup/molXXXXortnXXXX
+            rootGroup: Which is the group to select randomly from? usually /train or /validation    
+            
+        Returns: a dictionary containing 
+            'forces': a np.ndarray of shape (batchsize,)+self.shape
+            'solutions': a np.ndarray of shape (batchsize,)+self.shape[:-2]+(outputChannels,)
+            'atomPosition': only if returnAtomPositions == True, a list containing the atomNameString and the atom positions in the same order as they appear in the atomNameString
+            
         """
         batch_Fz=np.zeros((batchsize,)+self.shape)   # Maybe I can solve this somehow differently by not hardcoding the dimensions? For now I want to hardcode the dimensions, since the NN is also not flexible concerning them.
         batch_solutions=np.zeros((batchsize,)+self.shape[:-2]+(outputChannels,))
@@ -263,6 +376,18 @@ class AFMdata:
         
         
     def add_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
+        """ Annotates a .hdf5 database with solutions. Use if no previous labels exist, if there are existing labels, use change_labels. 
+        
+        Args:
+            method: method on how to calculate the solution (label), options are: xymap_collapsed, xymap_projection, singleAtom
+            COMposition: Center Of Mass position, some DBs have the COM centered at [.01, .01, .0]
+            sigmabasexy: 'standarddeviation' of the gaussian in the xy-plane
+            sigmabasez: 'standarrdeviation' of the gaussina in z-direction 
+            amplificationFactor: Factor to amplify the gaussian by. Basically the strength of the 'signal' of a C atom at its position. 
+        Returns:
+            No return.
+        """
+        
         
         for molstr in self.f.keys():
             timestart=time.time()
@@ -284,8 +409,20 @@ class AFMdata:
             print("This molecule took %f seconds to label."%(timeend-timestart))
             
             
-    def change_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):
-        """Options for method: 'xymap_collapsed', 'xymap_projection', 'singleAtom'
+    def change_labels(self, method='xymap_collapsed', COMposition=[0.,0.,0.], sigmabasexy=1.0, sigmabasez=1.0, amplificationFactor=1.0):    
+        """Annotates a .hdf5 database with solutions. Use if add_labels has been used before to change them.
+        
+        Options for method: 'xymap_collapsed', 'xymap_projection', 'singleAtom'
+        
+        Args:
+            method: method on how to calculate the solution (label), options are: xymap_collapsed, xymap_projection, singleAtom
+            COMposition: Center Of Mass position, some DBs have the COM centered at [.01, .01, .0]
+            sigmabasexy: 'standarddeviation' of the gaussian in the xy-plane
+            sigmabasez: 'standarrdeviation' of the gaussina in z-direction 
+            amplificationFactor: Factor to amplify the gaussian by. Basically the strength of the 'signal' of a C atom at its position. 
+        Returns:
+            No return.
+        
         """
         for molstr in self.f.keys():
             timestart=time.time()

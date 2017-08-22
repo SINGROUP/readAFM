@@ -10,6 +10,24 @@ from utils import *
 import tensorflow as tf
 
 def eval_model(model_function, Fz_xyz, solution, keep_prob, posxyz, parameters, logfile):
+    """ Evaluates the model_function that is passed to it.
+    
+    What kind of database, solutions, etc. to use can be specified in the parameters-dictionary.
+    For some reason tensorflow wants the placeholders to be defined on the topmost level, so they need to be passed to this function, although they will be filled and used only within this function.
+    
+    Args:
+        model_function: Function that defines the model, see model.py, should be model_function(Fz_xyz, keep_prob, parameters, logfile), returns tensor outputlayer (batchsize, xdim, ydim, outChannels)
+        Fz_xyz: Placeholder for the force values
+        solution: placeholder for the solutions
+        keep_prob: placeholder for the keep probability of the dropout layer
+        posxyz: placeholder for the xyz positions, to be stored as text for tensorboard
+        parameters: dict containing the parameters
+        logfile: handle for the logfile
+        
+    Returns:
+        If finished without error =0
+    
+    """
     LOGDIR = parameters['logdir']       
     
     # Define model:
