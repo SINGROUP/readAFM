@@ -114,9 +114,34 @@ Contains auxiliary functions.
 Code snippets and functions to visualize arrays saved in .npy or .hdf5 files.
 
 
+Input Parameters
+----------------
 
 
 
+train							: True
+restorePath   					: None
+saveName						: "CNN_minimal_TR1_{}.ckpt".format(args.name)
+DBPath							: ../AFMDB_version_01.hdf5
+DBShape							: [41,41,41,1]
+outChannels						: 1
+logdir							: './save{}/'.format(args.name)
+viewPath						: './viewfile_{}.hdf5'.format(args.name)
+logPath					 		: './out_minimal_{}.log'.format(args.name)
+trainstepsNumber				: 1
+trainbatchSize  				: 1 
+testbatchSize					: 1
+LearningRate					: 0.001
+costWeight						: 1.0
+useRuntimeSolution				: False
+RuntimeSol.method				: xymap_collapsed 
+RuntimeSol.COMposition			: [0.,0.,0.] 
+RuntimeSol.sigmabasexy			: 1.0
+RuntimeSol.sigmabasez			: 17.0
+RuntimeSol.amplificationFactor	: 1.0
+numberTBImages					: 5
+logEvery						: 100
+saveEvery						: 100
 
 
 
