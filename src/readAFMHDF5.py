@@ -11,7 +11,8 @@ def atomSignal(evalvect, meanvect, atomNameString, sigmabasexy=1.0, sigmabasez=1
     Sigmabase is multiplied with the relative covalent ratius, with C corresponding to 1.
     I think it can be interpreted as a length in A.
     """
-    covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}  
+    # covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57, 'Si' : 111, 'B' : 82, 'Al' : 121, 'Na' : 154, 'P' : 106, 'S' : 105, 'Cl' : 102}  
+    covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57, 'I' : 111, 'B' : 82, 'A' : 121, 'D' : 154, 'P' : 106, 'S' : 105, 'L' : 102}
     [sigmabasexy, sigmabasez] = map(lambda x: x*((float(covalentRadii[atomNameString]))/76.),[sigmabasexy, sigmabasez])
     normalisation = amplification*(covalentRadii[atomNameString])/76.
     return normalisation*exp(-((evalvect[0]-meanvect[0])**2+(evalvect[1]-meanvect[1])**2)/sigmabasexy**2)*exp(-((evalvect[2]-meanvect[2])**2)/sigmabasez**2)
@@ -37,10 +38,14 @@ class AFMdata:
     
         atomNameString=self.f[datasetString].attrs['atomNameString']
         atomPosition=self.f[datasetString+'/atomPosition']
-        AtomDict = {'C': 0, 'H': 1, 'O': 2, 'N': 3, 'F': 4}
+        # AtomDict =  {'C': 0, 'H': 1, 'O': 2, 'N': 3, 'F': 4, 'S': 5, 'Si' : 6, 'B' : 7, 'Al' : 8, 'Na' : 9, 'P' : 10, 'Cl' : 11}
+        AtomDict = {'C': 0, 'H': 1, 'O': 2, 'N': 3, 'F': 4, 'S': 5, 'I' : 6, 'B' : 7, 'A' : 8, 'D' : 9, 'P' : 10, 'L' : 11}
         #print raw
-        projected_array = np.zeros((self.f[datasetString].attrs['divxyz'][0], self.f[datasetString].attrs['divxyz'][1], 5))   # x, y, AtomNumber as in the dict
-        masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 'F' : 18.9984}
+        projected_array = np.zeros((self.f[datasetString].attrs['divxyz'][0], self.f[datasetString].attrs['divxyz'][1], 12))   # x, y, AtomNumber as in the dict
+        # masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 'F' : 18.9984, 'Si' : 28.0855, 'B' : 10.811, 'Al' : 26.9815, 'Na' : 22.9898, 'P' : 30.9738, 'Cl' : 35.453}
+        masses = {'H' : 1.008, 'C' : 12.011, 'O' : 15.9994, 'N' : 14.0067, 'S' : 32.065, 
+                  'F' : 18.9984, 'I' : 28.0855, 'B' : 10.811, 'A' : 26.9815, 'D' : 22.9898, 
+                  'P' : 30.9738, 'L' : 35.453}
 #         covalentRadii = {'H' : 31, 'C' : 76, 'O' : 66, 'N' : 71, 'F' : 57}
         # Calculate Center Of Mass:
         COM = np.array(COMposition)
@@ -310,11 +315,10 @@ class AFMdata:
         
 if __name__=='__main__':
     print('Hallo Main')
-    datafile = AFMdata('/l/reischt1/toyDB_v15_merged.hdf5', shape=(41,41,41,1))
+    datafile = AFMdata('/scratch/work/reischt1/flatMolecules_v18.hdf5', shape=(41,41,41,1))
 #     print(datafile.solution_xymap_collapsed('molecule1/orientation1'))
     testbatch = datafile.batch_runtimeSolution(20, orientationsOnly=True, rootGroup='/train', returnAtomPositions=True)
     print testbatch['atomPosition']
-    blafile = h5py.File('toyDB_validationFile.h5py', 'w')
     
     
     
