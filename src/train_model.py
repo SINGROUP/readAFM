@@ -37,7 +37,7 @@ def train_model(model_function, Fz_xyz, solution, keep_prob, posxyz, parameters,
 #     set up evaluation system
     with tf.name_scope('cost'):
         # cost = tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize']) 
-        cost = (1.- parameters['costWeight'])*tf.reduce_sum(tf.multiply(tf.square(tf.subtract(outputLayer, solution)), solution))/float(parameters['trainbatchSize']) + parameters['costWeight']*tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize'])
+        cost = (1.- parameters['costWeight'])*(1./parameters['RuntimeSol.amplificationFactor'])*tf.reduce_sum(tf.multiply(tf.square(tf.subtract(outputLayer, solution)), solution))/float(parameters['trainbatchSize']) + parameters['costWeight']*tf.reduce_sum(tf.square(tf.subtract(outputLayer, solution)))/float(parameters['trainbatchSize'])
         tf.summary.scalar('cost', cost)
         
     with tf.name_scope('accuracy'):
