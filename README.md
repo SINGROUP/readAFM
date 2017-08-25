@@ -148,6 +148,7 @@ For symmetrical molecules MechAFM sometimes has a bug when the COM is centered a
 
 #### RuntimeSol.amplificationFactor
 `Default: 1.0`
+Amplification factor to be set when the solution is calculated during runtime. BUT: Set it also when using precalculated solutions, because it is used to normalize the cost function!!! (For more details see the report in readAFM/docs)
 
 #### numberTBImages
 `Default: 5`
