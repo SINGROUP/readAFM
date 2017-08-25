@@ -50,7 +50,7 @@ Tensorboard is a tool included in the Tensorflow package to make information abo
 tensorboard -logdir=.
 ```
 
-And point your browser to the indicated URL. In tensorboard there are two values displayed, accuracy is the squared difference per image, and cost is the cost used for training. Accuracy and cost are the same only if the parameter 'costWeight' is 1.0.
+And point your browser to the indicated URL. In tensorboard there are two values displayed, accuracy is the squared difference per image, and cost is the cost used for training. Accuracy and cost are the same only if the parameter 'costWeight' is 1.0. The IMAGES section is also very interesting, the regexp "image/0" (and so on) is quite handy.
 
 If you use triton, you might want to forward the url using ssh's -L handle:
 

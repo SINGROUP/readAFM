@@ -1,6 +1,7 @@
 \documentclass{article}
 \usepackage{amsmath}
 \usepackage[pdftex]{graphicx}
+\usepackage{hyperref}
 
 \begin{document}
 \author{Tobias Reisch}
@@ -21,6 +22,8 @@ This report contains a brief description of the most important steps in the proj
 
 About the title: The git-repository was named \emph{readAFM} in intentional similarity to \emph{mechAFM}, while \emph{mechAFM} simulates an AFM image with a mechanical model of the tip atoms, \emph{readAFM} was the attempt to understand the output "images" of an AFM, in a sense "read" them.
 
+The code written in the course of this internship is available under \\ \href{https://github.com/SINGROUP/readAFM/}{https://github.com/SINGROUP/readAFM/}.
+
 
 \newpage
 \section{Input}
@@ -34,7 +37,6 @@ Machine Learning usually needs a lot of training data to work. In our case this 
 \hline zhigh & zlow + 4 {\AA} \\ 
 \hline dx,dy,dz & 0.2 {\AA} \\ 
 \hline 
-
 \end{tabular} 
 \end{center}
 
@@ -105,12 +107,89 @@ After the 3D convolutions preserved the order of the tensor, now we want to redu
 
 For this Neural Net the filters of the convolution and the weights and biases can be trained with gradient descent. We used stochastic training with the Adam Optimizer \cite{kingma2014adam}, which was especially designed for stochastic training. 
 
+To use gradient descent we need to determine a scalar value as "cost" function which can then be minimized. We start out calculating a value for the "accuracy" which is the summed squared difference between the prediction of the NN and the label.
+
+\begin{equation}
+accuracy = \sum_{x, y} (v_{pred}(x,y)-v_{sol}(x,y))^2
+\end{equation}
+
+Where v(x,y) should represent the greyscale value at the position (x,y). This measure works to train the NN and is a good characteristic for the convergence of a training session. However, for small $\sigma_xy$ and small $amp$, the gradient descent would train the weights and biases to a state where they would just output zero everywhere. To prevent this, we adapted the accuracy function by multiplying it at each position (pixel) with the solution, see Eqn. \eqref{eq:acc_weighted}. Because $v_{sol}$ is 0 everywhere except at the positions of the atoms, this represents an extra penalty for false negatives (showing no atom even when there should be one). The $\frac{1}{amp}$ compensates for the fact that $v_{sol}$ ranges between 0 and amp, not 0 and 1.
+
+\begin{equation}
+accuracy_{weighted} = \sum_{x, y} \frac{1}{amp}* v_{sol}(x,y)*(v_{pred}(x,y)-v_{sol}(x,y))^2
+\label{eq:acc_weighted}
+\end{equation}
+
+Of course if only the weighted accuracy is used, there is no penalty to false positives (showing atoms where none should be) anymore. To prevent this, the cost function is made up by a mix of both accuracies, the proportionality can be determined by a parameter c (costWeight in the \emph{parameters.in} file).
+
+\begin{equation}
+cost = c*accuracy + (1-c)*accuracy_{weighted}
+\end{equation}
+
 The accuracy and trainability of this Neural Net can be changed in a several ways: By changing the filter size and number in the convolutions, using different sized fully connected layers (a FC layer with 64 neurons already works, but using larger FC layers improves the result drastically!) and of course adding more layers. The effect of these changes will be discussed in the next section.
 
 
 \newpage
-\section{Results}
+\section{Results and Outlook}
 
+Although the goal of the project is clearly set, to use ML to understand better AFM images of arbitrary molecules, it was more practical to start with a simplified task. At first we had a database filled with single atoms at random positions, mainly to debug and as a sanity check. Then we followed the "historical" route and produced a database of flat molecules (where the heavy atoms (everything except H) are all in one plane). The first NC-AFM experiments with atomic resolution were also performed on flat molecules, because a corrugation in z complicates the task even more. Which is what we did in a third step. We used 1000 molecules from \cite{ramakrishnan2014quantum} and simulated each in 100 random orientations.
+
+The analysis for the flatDB worked quite well. Our CNN was able to predict the correct positions of the atoms quite well, or a few examples see figure \ref{fig:resultsflatDB}. It became apparent that especially a larger hidden layer improves the performance a lot. 
+
+\begin{figure}[htbp]
+	\begin{center}
+		\includegraphics[width=14cm]{figs/flatMolecules_HL512/collection.png}
+
+		\caption{Flat molecules analyzed with the NN configuration: Conv3D 4x4x4x16, Conv3D 4x4x4x32, FC512}
+		\label{fig:resultsflatDB}
+	\end{center}
+\end{figure}
+
+For the database filled with random three dimensional molecules in random orientations there is the extra problem, that not all parts of the molecule are visible. To find the optimal $\sigma_z$ we tried to maximize the Mutual Information for the $F_z$-tensor and the solution-"image" as a function of $\sigma_z$, this value agreed quite well with the previous estimate (just from looking at it). However, the resulting predictions are not as good as they are for the flat molecules. In figure \ref{fig:resultsfullDB} the results of the  most basic configuration are shown, the positions of the atoms are not predicted as well as for the flat molecules. We were also not able to improve them much with bigger hidden layers.
+
+\begin{figure}[htbp]
+	\begin{center}
+		\includegraphics[width=14cm]{figs/fullDB_base/collection.png}
+		\caption{Random molecules analyzed with the NN configuration: Conv3D 4x4x4x16, Conv3D 4x4x4x32, FC64}
+		\label{fig:resultsfullDB}
+	\end{center}
+\end{figure}
+
+Here is a table of configurations that were tried:
+
+\begin{center}
+\begin{tabular}{|l|}
+\hline conv3d(4x4x4x16) tanh conv3d(4x4x4x32) tanh hl64 relu \\
+\hline conv3d(4x4x4x16) tanh conv3d(4x4x4x32) tanh hl128 relu \\
+\hline conv3d(4x4x4x16) tanh conv3d(4x4x4x32) tanh hl256 relu \\
+\hline conv3d(4x4x4x16) tanh conv3d(4x4x4x32) tanh hl512 relu \\
+\hline conv3d(4x4x4x16) tanh conv3d(4x4x4x32) tanh hl1024 relu \\
+\hline conv3d(8x8x8x16) tanh conv3d(8x8x8x32) tanh hl64 relu \\
+\hline conv3d(8x8x8x16) tanh conv3d(8x8x8x32) tanh hl256 relu \\
+\hline conv3d(4x4x4x16) tanh conv3d(4x4x4x32) tanh hl64 relu conv2d(4x4x16) relu \\
+\hline conv3d(4x4x4x16) tanh conv3d(4x4x4x32) tanh conv2d(4x4x32) tanh hl64 relu \\
+\hline
+\end{tabular}
+\end{center}
+\\
+
+We also tested for which $\sigma_{xy}$/amp combinations successful training was possible and when it would just converge to 0 everywhere, we prove that the improved cost function made the values for $\sigma_xy$/amp much lower. It is also possible to avoid local minimal by starting from a larger $\sigma_{xy}$ and use that weights and biases as a starting point to train for smaller $\sigma_{xy}$.
+
+%\newpage
+%\section{}
+
+Possibly adding an extra convolutional layer or more hidden layers could improve the results. An option also worth considering might be to apply extra operations on the output layer. These could either be some filters, e.g. a search for local maxima, or again a Neural Net, e.g. convolutional layer that is trained separately from the CNN.
+
+Maybe the cut through the Gaussians at the height of the topmost atom, is not optimal. From a physical perspective doing the cut at the lowest position of the tip could also make sense.
+
+We already contacted experimentalists, about NC-AFM data which we could use our NN on. Potential insights include whether the training on data simulated with \emph{MechAFM} works, or if a more sophisticated model is necessary. It would also test our model for its robustness against experimental artifacts.
+
+The exchange with experimentalists is also very valuable with regard to the future direction of this project: What form of possible applications for automated (NC-)AFM experiments would be the most welcome?
+
+
+
+
+\newpage
 \bibliographystyle{unsrt}
 \bibliography{readAFM}
 

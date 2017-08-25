@@ -16,7 +16,6 @@ Sampsa~K H{\"a}m{\"a}l{\"a}inen, Nadine van~der Heijden, Joost van~der Lit,
 
 \bibitem{MIestimator}
 Yashasvi Ranavat.
-\newblock Mi estimator.
 \newblock https://github.com/SINGROUP/MutualInformation.
 
 \bibitem{krizhevsky2012imagenet}
@@ -29,5 +28,11 @@ Alex Krizhevsky, Ilya Sutskever, and Geoffrey~E Hinton.
 Diederik Kingma and Jimmy Ba.
 \newblock Adam: A method for stochastic optimization.
 \newblock {\em arXiv preprint arXiv:1412.6980}, 2014.
+
+\bibitem{ramakrishnan2014quantum}
+Raghunathan Ramakrishnan, Pavlo~O Dral, Matthias Rupp, and O~Anatole
+  Von~Lilienfeld.
+\newblock Quantum chemistry structures and properties of 134 kilo molecules.
+\newblock {\em Scientific data}, 1:140022, 2014.
 
 \end{thebibliography}
