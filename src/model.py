@@ -8,7 +8,11 @@ import tensorflow as tf
 
 
 def weight_variable(shape, name=None):
-    """ Initializes the variable with random numbers (not 0) """
+    """ Initializes the variable with random numbers s.t. it's not all zeros.
+    
+    Args:
+        shape: shape of the variable
+    """
     initial = tf.truncated_normal(shape, stddev=0.1)
     if name:
         return tf.Variable(initial, name=name)
@@ -16,7 +20,11 @@ def weight_variable(shape, name=None):
         return tf.Variable(initial)
 
 def bias_variable(shape, name=None):
-    """ Initializes the bias variable with 0.1 everywhere """
+    """ Initializes the bias variable with 0.1 everywhere.
+    
+    Args:
+        shape: shape of the variable
+    """
     initial = tf.constant(0.1, shape=shape)
     if name:
         return tf.Variable(initial, name=name)
@@ -24,13 +32,27 @@ def bias_variable(shape, name=None):
         return tf.Variable(initial)
 
 def conv3d(x, W):
-    """ Short definition of the convolution function for 3d """
+    """ Short definition of the convolution function for 3d. 
+    
+    Args:
+        x: Tensor to be convolved.
+        W: weights (filters) to convolve with
+    """
     return tf.nn.conv3d(x, W, strides=[1,1,1,1,1], padding='SAME')
 
 def define_model(Fz_xyz, keep_prob, parameters, logfile):
-    """ Defines the model, that then will be trained or evaluated by the other functions.
-    Input: Placeholder for the Fz values, dicitionary containing the parameters, handle for logfile.
-    Output: outputlayer for the training. 
+    """ Defines the model, that then will be trained or evaluated by other functions.
+    
+    For some reason tensorflow needs the placeholders to be passed to this function, not otherwise.
+    
+    Args: 
+        Fz_xyz: Placeholder for the Fz values
+        keep_prob: Placeholder for the keep probability of the dropout layer
+        parameters: dicitionary containing the parameters
+        logfile: handle for logfile.
+        
+    Returns:
+        outputlayer, tensor of shape (batchsize, xdim, ydim, outchannels), for the training or further use. 
     """
 
     DBShape = parameters['DBShape']

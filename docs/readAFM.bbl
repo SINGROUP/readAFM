@@ -1,5 +1,11 @@
 \begin{thebibliography}{1}
 
+\bibitem{gross2009chemical}
+Leo Gross, Fabian Mohn, Nikolaj Moll, Peter Liljeroth, and Gerhard Meyer.
+\newblock The chemical structure of a molecule resolved by atomic force
+  microscopy.
+\newblock {\em Science}, 325(5944):1110--1114, 2009.
+
 \bibitem{hapala2014}
 Prokop Hapala, Georgy Kichin, Christian Wagner, F~Stefan Tautz, Ruslan Temirov,
   and Pavel Jel{\'\i}nek.
@@ -16,7 +22,6 @@ Sampsa~K H{\"a}m{\"a}l{\"a}inen, Nadine van~der Heijden, Joost van~der Lit,
 
 \bibitem{MIestimator}
 Yashasvi Ranavat.
-\newblock Mi estimator.
 \newblock https://github.com/SINGROUP/MutualInformation.
 
 \bibitem{krizhevsky2012imagenet}
@@ -25,9 +30,22 @@ Alex Krizhevsky, Ilya Sutskever, and Geoffrey~E Hinton.
 \newblock In {\em Advances in neural information processing systems}, pages
   1097--1105, 2012.
 
+\bibitem{kraus2017automated}
+Oren~Z Kraus, Ben~T Grys, Jimmy Ba, Yolanda Chong, Brendan~J Frey, Charles
+  Boone, and Brenda~J Andrews.
+\newblock Automated analysis of high-content microscopy data with deep
+  learning.
+\newblock {\em Molecular systems biology}, 13(4):924, 2017.
+
 \bibitem{kingma2014adam}
 Diederik Kingma and Jimmy Ba.
 \newblock Adam: A method for stochastic optimization.
 \newblock {\em arXiv preprint arXiv:1412.6980}, 2014.
+
+\bibitem{ramakrishnan2014quantum}
+Raghunathan Ramakrishnan, Pavlo~O Dral, Matthias Rupp, and O~Anatole
+  Von~Lilienfeld.
+\newblock Quantum chemistry structures and properties of 134 kilo molecules.
+\newblock {\em Scientific data}, 1:140022, 2014.
 
 \end{thebibliography}
